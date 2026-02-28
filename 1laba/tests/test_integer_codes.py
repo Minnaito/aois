@@ -29,7 +29,7 @@ class TestIntegerCodes(unittest.TestCase):
         for num in test_cases:
             with self.subTest(num=num):
                 bits = self.codes.int_to_sign_magnitude(num)
-                self.assertEqual(bits[0], 0)  # знаковый бит = 0 для положительных
+                self.assertEqual(bits[0], 0)  
                 self.assertEqual(self.codes.sign_magnitude_to_int(bits), num)
 
     def test_sign_magnitude_negative(self):
@@ -38,7 +38,7 @@ class TestIntegerCodes(unittest.TestCase):
         for num in test_cases:
             with self.subTest(num=num):
                 bits = self.codes.int_to_sign_magnitude(num)
-                self.assertEqual(bits[0], 1)  # знаковый бит = 1 для отрицательных
+                self.assertEqual(bits[0], 1)  
                 self.assertEqual(self.codes.sign_magnitude_to_int(bits), num)
 
     def test_sign_magnitude_overflow_positive(self):
@@ -136,4 +136,5 @@ class TestIntegerCodes(unittest.TestCase):
                 self.assertEqual(self.codes.twos_complement_to_int(tc_bits), num)
 
 if __name__ == '__main__':
+
     unittest.main()
