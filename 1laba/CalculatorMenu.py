@@ -123,7 +123,6 @@ class CalculatorMenu:
             print(f"{b} в прямом коде: {self.utils.show_bits(bits_b)}")
             print(f"Результат деления в прямом коде: {self.utils.show_bits(bits_res)}")
 
-            # Получаем строку битов и форматируем красиво
             bits_str = ''.join(map(str, bits_res))
             formatted_bits = ' '.join([bits_str[i:i + 4] for i in range(0, 32, 4)])
 
@@ -194,4 +193,5 @@ class CalculatorMenu:
 
 if __name__ == "__main__":
     app = CalculatorMenu()
+
     app.run()
