@@ -3,7 +3,6 @@ import sys
 import os
 from io import StringIO
 
-# Добавляем путь к модулям
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from CalculatorMenu import CalculatorMenu
@@ -36,7 +35,6 @@ class TestCalculatorMenu(unittest.TestCase):
 
     def test_print_menu(self):
         """Тест вывода меню"""
-        # Сохраняем оригинальный stdout
         original_stdout = sys.stdout
         sys.stdout = StringIO()
 
@@ -44,7 +42,6 @@ class TestCalculatorMenu(unittest.TestCase):
             self.menu.print_menu()
             output = sys.stdout.getvalue()
 
-            # Проверяем наличие всех пунктов меню
             self.assertIn("--- Меню операций ---", output)
             self.assertIn("1. Перевод десятичного числа", output)
             self.assertIn("2. Сложение двух чисел в дополнительном коде", output)
@@ -55,17 +52,14 @@ class TestCalculatorMenu(unittest.TestCase):
             self.assertIn("7. Сложение двух чисел в коде Excess-3", output)
             self.assertIn("0. Выход", output)
         finally:
-            # Восстанавливаем stdout
             sys.stdout = original_stdout
 
     def test_menu_translate_valid(self):
         """Тест перевода числа с валидным вводом"""
-        # Сохраняем оригинальные stdin/stdout
         original_stdin = sys.stdin
         original_stdout = sys.stdout
 
         try:
-            # Подменяем ввод
             sys.stdin = StringIO("5\n")
             sys.stdout = StringIO()
 
@@ -77,7 +71,6 @@ class TestCalculatorMenu(unittest.TestCase):
             self.assertIn("Дополнительный:", output)
             self.assertIn("Десятичное значение для проверки: 5", output)
         finally:
-            # Восстанавливаем
             sys.stdin = original_stdin
             sys.stdout = original_stdout
 
@@ -383,4 +376,5 @@ class TestCalculatorMenuIntegration(unittest.TestCase):
 
 
 if __name__ == '__main__':
+
     unittest.main(verbosity=2)
