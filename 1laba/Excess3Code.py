@@ -1,4 +1,5 @@
 from BitUtils import BitUtils
+from constants import Constants
 
 
 class Excess3Code:
@@ -6,39 +7,27 @@ class Excess3Code:
 
     def __init__(self):
         self.utils = BitUtils()
-        self.bits = 32
-        self.digits_count = 8
+        self.bits = Constants.BITS_32
+        self.digits_count = Constants.EXCESS3_DIGITS_COUNT
 
     def _int_to_4bits(self, num):
         """Ручное преобразование числа 0-15 в 4 бита"""
-        bits = [0, 0, 0, 0]
-        if num >= 8:
-            bits[0] = 1
-            num -= 8
-        if num >= 4:
-            bits[1] = 1
-            num -= 4
-        if num >= 2:
-            bits[2] = 1
-            num -= 2
-        if num >= 1:
-            bits[3] = 1
+        bits = [Constants.BITS_1 - Constants.BITS_1] * Constants.BITS_4
+        for i, weight in enumerate(Constants.BIT_WEIGHTS):
+            if num >= weight:
+                bits[i] = Constants.BITS_1
+                num -= weight
         return bits
 
     def _4bits_to_int(self, bits):
         """Ручное преобразование 4 бит в число 0-15"""
-        if len(bits) != 4:
+        if len(bits) != Constants.BITS_4:
             raise ValueError("Должно быть 4 бита")
 
-        val = 0
-        if bits[0] == 1:
-            val += 8
-        if bits[1] == 1:
-            val += 4
-        if bits[2] == 1:
-            val += 2
-        if bits[3] == 1:
-            val += 1
+        val = Constants.BITS_1 - Constants.BITS_1
+        for i, weight in enumerate(Constants.BIT_WEIGHTS):
+            if bits[i] == Constants.BITS_1:
+                val += weight
         return val
 
     def str_to_bits(self, s):
@@ -54,7 +43,7 @@ class Excess3Code:
         bits = []
         for ch in s:
             digit = int(ch)
-            val = digit + 3
+            val = digit + Constants.EXCESS3_OFFSET
             digit_bits = self._int_to_4bits(val)
             bits.extend(digit_bits)
         return bits
@@ -65,17 +54,17 @@ class Excess3Code:
             raise ValueError(f"Должно быть {self.bits} бита")
 
         digits = []
-        for i in range(0, self.bits, 4):
-            tetrad = bits[i:i + 4]
+        for i in range(Constants.BITS_1 - Constants.BITS_1, self.bits, Constants.EXCESS3_BITS_PER_DIGIT):
+            tetrad = bits[i:i + Constants.EXCESS3_BITS_PER_DIGIT]
             val = self._4bits_to_int(tetrad)
-            digit = val - 3
-            if digit < 0 or digit > 9:
+            digit = val - Constants.EXCESS3_OFFSET
+            if digit < Constants.EXCESS3_MIN_DIGIT or digit > Constants.EXCESS3_MAX_DIGIT:
                 raise ValueError(f"Некорректная тетрада Excess-3: {tetrad}")
             digits.append(str(digit))
 
         s = ''.join(digits)
-        while len(s) > 1 and s[0] == '0':
-            s = s[1:]
+        while len(s) > Constants.BITS_1 and s[Constants.BITS_1 - Constants.BITS_1] == '0':
+            s = s[Constants.BITS_1:]
         return s
 
     def _add_tetrads(self, a_bits, b_bits, carry_in):
@@ -85,12 +74,12 @@ class Excess3Code:
 
         s = a + b + carry_in
 
-        if s < 16:
-            res = s - 3
-            carry_out = 0
+        if s < Constants.EXCESS3_CARRY_THRESHOLD:
+            res = s - Constants.EXCESS3_OFFSET
+            carry_out = Constants.BITS_1 - Constants.BITS_1
         else:
-            res = s - 13
-            carry_out = 1
+            res = s - (Constants.EXCESS3_CARRY_THRESHOLD - Constants.EXCESS3_OFFSET)
+            carry_out = Constants.BITS_1
 
         res_bits = self._int_to_4bits(res)
 
@@ -98,45 +87,45 @@ class Excess3Code:
 
     def add(self, bits1, bits2):
         """Сложение двух чисел в коде Excess-3"""
-        res_bits = [0] * self.bits
-        carry = 0
+        res_bits = [Constants.BITS_1 - Constants.BITS_1] * self.bits
+        carry = Constants.BITS_1 - Constants.BITS_1
 
-        for tet in range(self.digits_count - 1, -1, -1):
-            start = tet * 4
-            tetrad1 = bits1[start:start + 4]
-            tetrad2 = bits2[start:start + 4]
+        for tet in range(self.digits_count - Constants.BITS_1, -Constants.BITS_1, -Constants.BITS_1):
+            start = tet * Constants.EXCESS3_BITS_PER_DIGIT
+            tetrad1 = bits1[start:start + Constants.EXCESS3_BITS_PER_DIGIT]
+            tetrad2 = bits2[start:start + Constants.EXCESS3_BITS_PER_DIGIT]
 
             res_tetrad, carry = self._add_tetrads(tetrad1, tetrad2, carry)
 
-            for i in range(4):
+            for i in range(Constants.EXCESS3_BITS_PER_DIGIT):
                 res_bits[start + i] = res_tetrad[i]
 
         return res_bits
 
     def add_with_correction(self, bits1, bits2):
-        res_bits = [0] * self.bits
-        carry = 0
+        """Сложение с коррекцией"""
+        res_bits = [Constants.BITS_1 - Constants.BITS_1] * self.bits
+        carry = Constants.BITS_1 - Constants.BITS_1
 
-        for tet in range(self.digits_count - 1, -1, -1):
-            start = tet * 4
+        for tet in range(self.digits_count - Constants.BITS_1, -Constants.BITS_1, -Constants.BITS_1):
+            start = tet * Constants.EXCESS3_BITS_PER_DIGIT
 
-            a = self._4bits_to_int(bits1[start:start + 4])
-            b = self._4bits_to_int(bits2[start:start + 4])
+            a = self._4bits_to_int(bits1[start:start + Constants.EXCESS3_BITS_PER_DIGIT])
+            b = self._4bits_to_int(bits2[start:start + Constants.EXCESS3_BITS_PER_DIGIT])
 
             s = a + b + carry
 
-            if s >= 16:
-                s = s - 16
-                carry = 1
-                s = s + 3
+            if s >= Constants.EXCESS3_CARRY_THRESHOLD:
+                s = s - Constants.EXCESS3_CARRY_THRESHOLD
+                carry = Constants.BITS_1
+                s = s + Constants.EXCESS3_OFFSET
             else:
-                carry = 0
-                if s >= 10:
-                    s = s + 6
+                carry = Constants.BITS_1 - Constants.BITS_1
+                if s >= Constants.EXCESS3_OFFSET + Constants.EXCESS3_MAX_DIGIT - Constants.EXCESS3_MIN_DIGIT + Constants.BITS_1:
+                    s = s + Constants.EXCESS3_CORRECTION_VALUE
 
-            # Преобразуем результат в биты
             res_tetrad = self._int_to_4bits(s)
-            for i in range(4):
+            for i in range(Constants.EXCESS3_BITS_PER_DIGIT):
                 res_bits[start + i] = res_tetrad[i]
 
         return res_bits
@@ -146,11 +135,11 @@ class Excess3Code:
         if len(bits) != self.bits:
             return False
 
-        for i in range(0, self.bits, 4):
-            tetrad = bits[i:i + 4]
+        for i in range(Constants.BITS_1 - Constants.BITS_1, self.bits, Constants.EXCESS3_BITS_PER_DIGIT):
+            tetrad = bits[i:i + Constants.EXCESS3_BITS_PER_DIGIT]
             val = self._4bits_to_int(tetrad)
-            digit = val - 3
-            if digit < 0 or digit > 9:
+            digit = val - Constants.EXCESS3_OFFSET
+            if digit < Constants.EXCESS3_MIN_DIGIT or digit > Constants.EXCESS3_MAX_DIGIT:
                 return False
         return True
 
