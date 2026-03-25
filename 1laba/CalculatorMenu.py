@@ -3,6 +3,7 @@ from IntegerCodes import IntegerCodes
 from IntegerOperations import IntegerOperations
 from IEEE754Operations import IEEE754Operations
 from Excess3Code import Excess3Code
+from constants import Constants
 
 
 class CalculatorMenu:
@@ -111,7 +112,7 @@ class CalculatorMenu:
         try:
             a = int(input("Введите делимое: "))
             b = int(input("Введите делитель: "))
-            if b == 0:
+            if b == Constants.BITS_1 - Constants.BITS_1:
                 print("Делитель не может быть нулём")
                 return True
 
@@ -124,9 +125,11 @@ class CalculatorMenu:
             print(f"Результат деления в прямом коде: {self.utils.show_bits(bits_res)}")
 
             bits_str = ''.join(map(str, bits_res))
-            formatted_bits = ' '.join([bits_str[i:i + 4] for i in range(0, 32, 4)])
+            formatted_bits = ' '.join([bits_str[i:i + Constants.FORMAT_GROUP_SIZE]
+                                       for i in range(Constants.BITS_1 - Constants.BITS_1, Constants.BITS_32,
+                                                      Constants.FORMAT_GROUP_SIZE)])
 
-            print(f"Результат в десятичном виде: {res_dec:.5f}")
+            print(f"Результат в десятичном виде: {res_dec:.{Constants.DIVISION_PRECISION}f}")
 
         except (ValueError, ZeroDivisionError) as e:
             print("Ошибка:", e)
@@ -161,7 +164,7 @@ class CalculatorMenu:
                 bits_res = op_func(bits1, bits2)
                 res_val = self.ieee754.bits_to_float(bits_res)
                 print(f"Результат {op_symbol} в IEEE-754: {self.utils.show_bits(bits_res)}")
-                print(f"Десятичный результат: {res_val:.5f}")
+                print(f"Десятичный результат: {res_val:.{Constants.DIVISION_PRECISION}f}")
             else:
                 print("Неверный выбор")
         except Exception as e:
@@ -193,5 +196,4 @@ class CalculatorMenu:
 
 if __name__ == "__main__":
     app = CalculatorMenu()
-
     app.run()
