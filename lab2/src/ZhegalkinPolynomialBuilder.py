@@ -8,71 +8,66 @@ class ZhegalkinPolynomialBuilder:
 
     def __init__(self, truth_table: list, variables: list):
         self.truth_table = truth_table
-        self.variables = variables
+        self.variables = variables[::-1]
         self.polynomial = ""
         self._build_polynomial()
 
     def _build_polynomial(self):
-        """Построение полинома Жегалкина"""
         n = len(self.variables)
-        size = 1 << n
-        values = [row['output'] for row in self.truth_table]
+        size = Constants.POWER_BASE ** n
+        values = [row[Constants.OUTPUT_KEY] for row in self.truth_table]
 
         coefficients = values.copy()
-
         for i in range(n):
-            step = 1 << i
+            step = Constants.POWER_BASE ** i
             for j in range(size):
-                if j & (1 << i):
-                    coefficients[j] ^= coefficients[j ^ (1 << i)]
+                if j & (Constants.POWER_BASE ** i):
+                    coefficients[j] ^= coefficients[j ^ (Constants.POWER_BASE ** i)]
 
         terms = []
         for mask in range(size):
-            if coefficients[mask] == 1:
+            if coefficients[mask] == Constants.ONE:
                 term = self._build_term(mask)
                 if term:
                     terms.append(term)
 
+        if not terms:
+            self.polynomial = Constants.DEFAULT_OUTPUT_ZERO
+        else:
+            self.polynomial = f" {Constants.OP_XOR} ".join(terms)
+
         def term_key(term):
             if term == Constants.DEFAULT_OUTPUT_ONE:
-                return 0
-            return len(term.split(Constants.OP_AND))
+                return Constants.ZERO
+            return len(term)
 
         terms.sort(key=term_key)
 
         if not terms:
             self.polynomial = Constants.DEFAULT_OUTPUT_ZERO
         else:
-            self.polynomial = " ⊕ ".join(terms)
+            self.polynomial = f" {Constants.OP_XOR} ".join(terms)
 
     def _build_term(self, mask: int) -> str:
         """Построение терма по маске"""
-        if mask == 0:
+        if mask == Constants.ZERO:
             return Constants.DEFAULT_OUTPUT_ONE
 
         terms = []
-        for i, var in enumerate(self.variables):
-            if mask & (1 << i):
-                terms.append(var)
+        n = len(self.variables)
+        for i in range(n - Constants.ONE, -Constants.ONE, -Constants.ONE):
+            if mask & (Constants.POWER_BASE ** i):
+                terms.append(self.variables[i])
 
-        if len(terms) == 1:
-            return terms[0]
+        if len(terms) == Constants.ONE:
+            return terms[Constants.ZERO_INDEX]
 
-        return Constants.OP_AND.join(terms)
-
-        def term_key(term):
-            if term == Constants.DEFAULT_OUTPUT_ONE:
-                return 0
-            return len(term.split(Constants.OP_AND))
-
-        terms.sort(key=term_key)
-
-        self.polynomial = " ⊕ ".join(terms) if terms else Constants.DEFAULT_OUTPUT_ZERO
+        return ''.join(terms)
 
     def get_polynomial(self) -> str:
-        """Получение полинома Жегалкина"""
+        """Возвращает полином Жегалкина"""
         return self.polynomial
 
     def print_polynomial(self):
-        """Вывод полинома Жегалкина"""
-        print(f"\nПолином Жегалкина: {self.polynomial}")
+        """Выводит полином Жегалкина"""
+        print(f"Полином Жегалкина: {self.polynomial}")
