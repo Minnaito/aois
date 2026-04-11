@@ -1,150 +1,158 @@
 import unittest
-import sys
-import os
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from src.BooleanDerivativeCalculator import BooleanDerivativeCalculator
-from src.TruthTableGenerator import TruthTableGenerator
+from src.TruthTable import TruthTable
+from src.ExpressionParser import BooleanExpressionParser
+from src.constants import Constants
 
 
 class TestBooleanDerivativeCalculator(unittest.TestCase):
-    """Тесты для BooleanDerivativeCalculator"""
-
     def setUp(self):
-        self.tt_and = TruthTableGenerator("a&b")
-        self.calc_and = BooleanDerivativeCalculator(
-            self.tt_and.get_truth_table(),
-            self.tt_and.get_variables()
-        )
+        self.parser = BooleanExpressionParser()
 
-        self.tt_or = TruthTableGenerator("a|b")
-        self.calc_or = BooleanDerivativeCalculator(
-            self.tt_or.get_truth_table(),
-            self.tt_or.get_variables()
-        )
+    def _create_calculator(self, expr, variables):
+        tt = TruthTable(variables, expr, self.parser)
+        truth_table_list = [{'inputs': bits, 'output': res} for bits, res in tt]
+        return BooleanDerivativeCalculator(truth_table_list, variables)
 
-        self.tt_xor = TruthTableGenerator("a^b")
-        self.calc_xor = BooleanDerivativeCalculator(
-            self.tt_xor.get_truth_table(),
-            self.tt_xor.get_variables()
-        )
+    def test_partial_derivative_and(self):
+        calc = self._create_calculator("a&b", ['a','b'])
+        self.assertEqual(calc.partial('a'), 'b')
+        self.assertEqual(calc.partial('b'), 'a')
 
-        self.tt_three = TruthTableGenerator("a&b|c")
-        self.calc_three = BooleanDerivativeCalculator(
-            self.tt_three.get_truth_table(),
-            self.tt_three.get_variables()
-        )
+    def test_partial_derivative_xor_like(self):
+        calc = self._create_calculator("!(a~b)", ['a','b'])
+        self.assertEqual(calc.partial('a'), '1')
+        self.assertEqual(calc.partial('b'), '1')
 
-        self.tt_majority = TruthTableGenerator("(a&b)|(a&c)|(b&c)")
-        self.calc_majority = BooleanDerivativeCalculator(
-            self.tt_majority.get_truth_table(),
-            self.tt_majority.get_variables()
-        )
+    def test_partial_derivative_constant(self):
+        calc = self._create_calculator("1", ['a'])
+        self.assertEqual(calc.partial('a'), '0')
+        calc = self._create_calculator("0", ['a'])
+        self.assertEqual(calc.partial('a'), '0')
 
-    def test_partial_derivative_and_by_a(self):
-        derivative = self.calc_and.partial('a')
-        self.assertEqual(derivative, 'b')
+    def test_mixed_derivative(self):
+        calc = self._create_calculator("a&b&c", ['a','b','c'])
+        self.assertEqual(calc.mixed(['a','b']), 'c')
+        self.assertEqual(calc.mixed(['a','b','c']), '1')
 
-    def test_partial_derivative_and_by_b(self):
-        derivative = self.calc_and.partial('b')
-        self.assertEqual(derivative, 'a')
+    def test_mixed_derivative_single_var(self):
+        calc = self._create_calculator("a&b", ['a','b'])
+        self.assertEqual(calc.mixed(['a']), calc.partial('a'))
 
-    def test_partial_derivative_or_by_a(self):
-        derivative = self.calc_or.partial('a')
-        self.assertIsInstance(derivative, str)
-
-    def test_partial_derivative_or_by_b(self):
-        derivative = self.calc_or.partial('b')
-        self.assertIsInstance(derivative, str)
-
-    def test_partial_derivative_xor_by_a(self):
-        derivative = self.calc_xor.partial('a')
-        self.assertEqual(derivative, '1')
-
-    def test_partial_derivative_xor_by_b(self):
-        derivative = self.calc_xor.partial('b')
-        self.assertEqual(derivative, '1')
-
-    def test_partial_table(self):
-        table = self.calc_and.partial_table('a')
-        self.assertEqual(len(table), 2)
-        for comb, val in table:
-            self.assertIn(val, [0, 1])
-
-    def test_mixed_table(self):
-        table = self.calc_and.mixed_table('a', 'b')
-        self.assertEqual(len(table), 1)
-        for comb, val in table:
-            self.assertIn(val, [0, 1])
-
-    def test_invalid_variable(self):
+    def test_invalid_variable_partial(self):
+        calc = self._create_calculator("a", ['a'])
         with self.assertRaises(ValueError):
-            self.calc_and.partial('x')
+            calc.partial('x')
+
+    def test_invalid_variable_mixed(self):
+        calc = self._create_calculator("a", ['a'])
         with self.assertRaises(ValueError):
-            self.calc_and.mixed_table('x', 'y')
+            calc.mixed(['x'])
 
-    def test_three_variables_partial(self):
-        derivative = self.calc_three.partial('a')
-        self.assertIsInstance(derivative, str)
-        self.assertNotEqual(derivative, "")
+    def test_duplicate_variables_mixed(self):
+        calc = self._create_calculator("a&b", ['a','b'])
+        with self.assertRaises(ValueError):
+            calc.mixed(['a','a'])
 
-    def test_print_partial(self):
-        import io
-        import sys
-        captured_output = io.StringIO()
-        sys.stdout = captured_output
-        self.calc_and.print_partial('a')
-        sys.stdout = sys.__stdout__
-        output = captured_output.getvalue()
-        self.assertIn("∂f/∂a", output)
+    def test_print_all(self):
+        calc = self._create_calculator("a&b", ['a','b'])
+        calc.print_all(max_order=2)
 
-    def test_print_invalid_variable(self):
-        import io
-        import sys
-        captured_output = io.StringIO()
-        sys.stdout = captured_output
-        self.calc_and.print_partial('x')
-        sys.stdout = sys.__stdout__
-        output = captured_output.getvalue()
-        self.assertIn("не найдена", output)
+    def test_expression_as_string_initialization(self):
+        calc = BooleanDerivativeCalculator("a&b", ['a','b'])
+        self.assertEqual(calc.partial('a'), 'b')
 
-    def test_evaluate_with_complex_expression(self):
-        result = self.calc_and._evaluate("(a&b)|c", {'a': 1, 'b': 1, 'c': 0})
-        self.assertEqual(result, 1)
+    def test_convert_table_to_dict(self):
+        table = [{'inputs': (0,0), 'output': 0}, {'inputs': (0,1), 'output': 0},
+                 {'inputs': (1,0), 'output': 0}, {'inputs': (1,1), 'output': 1}]
+        calc = BooleanDerivativeCalculator(table, ['a','b'])
+        self.assertEqual(calc.partial('a'), 'b')
 
-    def test_evaluate_simple_with_parens(self):
-        result = self.calc_and._evaluate_simple("(1 and 0)")
-        self.assertEqual(result, 0)
+    def test_evaluate_with_implication(self):
+        calc = self._create_calculator("a->b", ['a','b'])
+        self.assertEqual(calc.partial('a'), '¬b')
+        self.assertEqual(calc.partial('b'), 'a')
 
-    def test_compute_partial_values(self):
-        values = self.calc_and._compute_partial_values('a')
-        self.assertEqual(len(values), 2)
+    def test_evaluate_with_equivalence(self):
+        calc = self._create_calculator("a~b", ['a','b'])
+        self.assertEqual(calc.partial('a'), '1')
+        self.assertEqual(calc.partial('b'), '1')
 
-    def test_compute_mixed_values(self):
-        values = self.calc_and._compute_mixed_values('a', 'b')
-        self.assertEqual(len(values), 1)
+    def test_mixed_derivative_four_vars(self):
+        calc = self._create_calculator("a&b&c&d", ['a','b','c','d'])
+        self.assertEqual(calc.mixed(['a','b','c','d']), '1')
 
     def test_to_expression_all_zeros(self):
-        result = self.calc_and._to_expression([0, 0, 0, 0], ['a', 'b'])
-        self.assertEqual(result, "0")
+        calc = BooleanDerivativeCalculator("0", ['a'])
+        expr = calc._to_expression([0,0], ['a'])
+        self.assertEqual(expr, "0")
 
     def test_to_expression_all_ones(self):
-        result = self.calc_and._to_expression([1, 1, 1, 1], ['a', 'b'])
-        self.assertEqual(result, "1")
+        calc = BooleanDerivativeCalculator("1", ['a'])
+        expr = calc._to_expression([1,1], ['a'])
+        self.assertEqual(expr, "1")
 
-    def test_partial_for_majority(self):
-        derivative = self.calc_majority.partial('a')
-        self.assertIsInstance(derivative, str)
+    def test_simplify_method_exists(self):
+        calc = BooleanDerivativeCalculator("a", ['a','b'])
+        try:
+            result = calc._simplify("a ∨ b", ['a','b'])
+        except Exception as e:
+            self.fail(f"_simplify raised exception: {e}")
 
-    def test_partial_derivative_for_constant_function(self):
-        truth_table = [
-            {'inputs': (0,), 'output': 1},
-            {'inputs': (1,), 'output': 1}
-        ]
-        calc_const = BooleanDerivativeCalculator(truth_table, ['a'])
-        derivative = calc_const.partial('a')
-        self.assertEqual(derivative, '0')
+    def test_evaluate_simple_not(self):
+        calc = BooleanDerivativeCalculator("!a", ['a'])
+        result = calc._evaluate_simple("not 1")
+        self.assertEqual(result, 0)
+        result = calc._evaluate_simple("not 0")
+        self.assertEqual(result, 1)
+
+    def test_evaluate_simple_and(self):
+        calc = BooleanDerivativeCalculator("a", ['a'])
+        result = calc._evaluate_simple("1 and 1")
+        self.assertEqual(result, 1)
+        result = calc._evaluate_simple("1 and 0")
+        self.assertEqual(result, 0)
+
+    def test_evaluate_simple_or(self):
+        calc = BooleanDerivativeCalculator("a", ['a'])
+        result = calc._evaluate_simple("1 or 0")
+        self.assertEqual(result, 1)
+        result = calc._evaluate_simple("0 or 0")
+        self.assertEqual(result, 0)
+
+    def test_evaluate_simple_equiv(self):
+        calc = BooleanDerivativeCalculator("a", ['a'])
+        result = calc._evaluate_simple("1 == 1")
+        self.assertEqual(result, 1)
+        result = calc._evaluate_simple("1 == 0")
+        self.assertEqual(result, 0)
+
+    def test_evaluate_with_invalid_expr(self):
+        calc = BooleanDerivativeCalculator("a", ['a'])
+        result = calc._evaluate("invalid", {'a': 1})
+        self.assertEqual(result, 0)
+
+    def test_partial_derivative_complex(self):
+        calc = self._create_calculator("a|b", ['a','b'])
+        self.assertEqual(calc.partial('a'), '¬b')
+        self.assertEqual(calc.partial('b'), '¬a')
+
+    def test_mixed_derivative_order_three(self):
+        calc = self._create_calculator("a&b&c", ['a','b','c'])
+        result = calc.mixed(['a','b','c'])
+        self.assertEqual(result, '1')
+
+    def test_mixed_derivative_duplicate_variables(self):
+        """Тест смешанной производной с дублирующимися переменными"""
+        calc = BooleanDerivativeCalculator("a&b", ['a', 'b'])
+        with self.assertRaises(ValueError):
+            calc.mixed(['a', 'a'])
+
+    def test_mixed_derivative_variable_not_found(self):
+        """Тест смешанной производной с несуществующей переменной"""
+        calc = BooleanDerivativeCalculator("a&b", ['a', 'b'])
+        with self.assertRaises(ValueError):
+            calc.mixed(['a', 'c'])
 
 
 if __name__ == '__main__':
