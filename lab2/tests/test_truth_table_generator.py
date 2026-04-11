@@ -1,179 +1,66 @@
 import unittest
-import sys
-import os
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from src.TruthTableGenerator import TruthTableGenerator
+from src.TruthTable import TruthTable
+from src.ExpressionParser import BooleanExpressionParser
+from src.constants import Constants
 
 
-class TestTruthTableGenerator(unittest.TestCase):
-    """Тесты для TruthTableGenerator"""
+class TestTruthTable(unittest.TestCase):
+    def setUp(self):
+        self.parser = BooleanExpressionParser()
 
-    def test_extract_variables_simple(self):
-        tt = TruthTableGenerator("a&b")
-        self.assertEqual(set(tt.get_variables()), {'a', 'b'})
+    def test_build_single_variable(self):
+        tt = TruthTable(['a'], 'a', self.parser)
+        table = tt.get_table()
+        self.assertEqual(table, [((0,), 0), ((1,), 1)])
+        self.assertEqual(tt.get_result_column(), [0, 1])
+        self.assertEqual(tt.get_ones_indices(), [1])
+        self.assertEqual(tt.get_zeros_indices(), [0])
+        self.assertEqual(tt.get_ones_sets(), [(1,)])
+        self.assertEqual(tt.get_zeros_sets(), [(0,)])
+        self.assertEqual(tt.get_value_at((1,)), 1)
 
-    def test_extract_variables_complex(self):
-        tt = TruthTableGenerator("(a|b)&!c")
-        self.assertEqual(set(tt.get_variables()), {'a', 'b', 'c'})
+    def test_get_value_at_invalid(self):
+        """Тест получения значения для несуществующего набора"""
+        tt = TruthTable(['a'], "a", self.parser)
+        with self.assertRaises(ValueError):
+            tt.get_value_at((1, 1))  # Неправильная размерность
 
-    def test_extract_variables_with_impl(self):
-        tt = TruthTableGenerator("a->b")
-        self.assertEqual(set(tt.get_variables()), {'a', 'b'})
+    def test_build_two_variables(self):
+        tt = TruthTable(['a', 'b'], 'a&b', self.parser)
+        table = tt.get_table()
+        expected = [
+            ((0,0), 0), ((0,1), 0), ((1,0), 0), ((1,1), 1)
+        ]
+        self.assertEqual(table, expected)
 
-    def test_constant_function(self):
-        tt = TruthTableGenerator("1")
-        self.assertEqual(tt.get_variables(), [])
-        table = tt.get_truth_table()
-        self.assertEqual(len(table), 1)
+    def test_build_constant_zero(self):
+        tt = TruthTable([], '0', self.parser)
+        self.assertEqual(tt.get_table(), [((), 0)])
 
-    def test_and_function(self):
-        tt = TruthTableGenerator("a&b")
-        table = tt.get_truth_table()
-        values = {row['inputs']: row['output'] for row in table}
-        self.assertEqual(values[(0, 0)], 0)
-        self.assertEqual(values[(0, 1)], 0)
-        self.assertEqual(values[(1, 0)], 0)
-        self.assertEqual(values[(1, 1)], 1)
+    def test_build_constant_one(self):
+        tt = TruthTable([], '1', self.parser)
+        self.assertEqual(tt.get_table(), [((), 1)])
 
-    def test_or_function(self):
-        tt = TruthTableGenerator("a|b")
-        table = tt.get_truth_table()
-        values = {row['inputs']: row['output'] for row in table}
-        self.assertEqual(values[(0, 0)], 0)
-        self.assertEqual(values[(0, 1)], 1)
-        self.assertEqual(values[(1, 0)], 1)
-        self.assertEqual(values[(1, 1)], 1)
+    def test_iteration(self):
+        tt = TruthTable(['a'], 'a', self.parser)
+        rows = list(tt)
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0], ((0,), 0))
 
-    def test_not_function(self):
-        tt = TruthTableGenerator("!a")
-        table = tt.get_truth_table()
-        values = {row['inputs']: row['output'] for row in table}
-        self.assertEqual(values[(0,)], 1)
-        self.assertEqual(values[(1,)], 0)
+    def test_len(self):
+        tt = TruthTable(['a', 'b'], 'a|b', self.parser)
+        self.assertEqual(len(tt), 4)
 
-    def test_xor_function(self):
-        tt = TruthTableGenerator("a^b")
-        table = tt.get_truth_table()
-        values = {row['inputs']: row['output'] for row in table}
-        self.assertEqual(values[(0, 0)], 0)
-        self.assertEqual(values[(0, 1)], 1)
-        self.assertEqual(values[(1, 0)], 1)
-        self.assertEqual(values[(1, 1)], 0)
-
-    def test_implication_function(self):
-        tt = TruthTableGenerator("a->b")
-        table = tt.get_truth_table()
-        values = {row['inputs']: row['output'] for row in table}
-        self.assertEqual(values[(0, 0)], 1)
-        self.assertEqual(values[(0, 1)], 1)
-        self.assertEqual(values[(1, 0)], 0)
-        self.assertEqual(values[(1, 1)], 1)
-
-    def test_equivalence_function(self):
-        tt = TruthTableGenerator("a~b")
-        table = tt.get_truth_table()
-        values = {row['inputs']: row['output'] for row in table}
-        self.assertEqual(values[(0, 0)], 1)
-        self.assertEqual(values[(0, 1)], 0)
-        self.assertEqual(values[(1, 0)], 0)
-        self.assertEqual(values[(1, 1)], 1)
+    def test_get_value_at_invalid(self):
+        tt = TruthTable(['a'], 'a', self.parser)
+        with self.assertRaises(ValueError):
+            tt.get_value_at((2,))
 
     def test_complex_expression(self):
-        tt = TruthTableGenerator("(a&b)|(!c)")
-        table = tt.get_truth_table()
-        self.assertEqual(len(table), 8)
-
-    def test_get_function_values(self):
-        tt = TruthTableGenerator("a&b")
-        values = tt.get_function_values()
-        self.assertEqual(len(values), 4)
-
-    def test_parse_expression_with_complex_implication_multiple(self):
-        """Тест парсинга с множественными импликациями"""
-        tt = TruthTableGenerator("a->b->c")
-        result = tt._parse_expression("a->b->c", {'a': 1, 'b': 1, 'c': 0})
-        self.assertIn(result, [True, False])
-
-    def test_safe_evaluate_simple_and(self):
-        """Тест безопасного вычисления AND"""
-        tt = TruthTableGenerator("a&b")
-        result = tt._safe_evaluate("1 and 1")
-        self.assertTrue(result)
-
-    def test_safe_evaluate_simple_or(self):
-        """Тест безопасного вычисления OR"""
-        tt = TruthTableGenerator("a|b")
-        result = tt._safe_evaluate("0 or 0")
-        self.assertFalse(result)
-
-    def test_safe_evaluate_not(self):
-        """Тест безопасного вычисления NOT"""
-        tt = TruthTableGenerator("!a")
-        result = tt._safe_evaluate("not 0")
-        self.assertTrue(result)
-
-    def test_safe_evaluate_xor(self):
-        """Тест безопасного вычисления XOR"""
-        tt = TruthTableGenerator("a^b")
-        result = tt._safe_evaluate("1 != 0")
-        self.assertTrue(result)
-
-    def test_safe_evaluate_equiv(self):
-        """Тест безопасного вычисления эквивалентности"""
-        tt = TruthTableGenerator("a~b")
-        result = tt._safe_evaluate("1 == 1")
-        self.assertTrue(result)
-
-    def test_safe_evaluate_with_parens(self):
-        """Тест безопасного вычисления со скобками"""
-        tt = TruthTableGenerator("a&b")
-        result = tt._safe_evaluate("(1 and 0)")
-        self.assertFalse(result)
-
-    def test_safe_evaluate_number(self):
-        """Тест безопасного вычисления числа"""
-        tt = TruthTableGenerator("1")
-        result = tt._safe_evaluate("1")
-        self.assertTrue(result)
-
-    def test_safe_evaluate_zero(self):
-        """Тест безопасного вычисления нуля"""
-        tt = TruthTableGenerator("0")
-        result = tt._safe_evaluate("0")
-        self.assertFalse(result)
-
-    def test_safe_evaluate_invalid(self):
-        """Тест безопасного вычисления некорректного выражения"""
-        tt = TruthTableGenerator("a&b")
-        result = tt._safe_evaluate("invalid")
-        self.assertFalse(result)
-
-    def test_empty_truth_table_print(self):
-        """Тест вывода пустой таблицы"""
-        tt = TruthTableGenerator("a&b")
-        tt.truth_table = []
-        import io
-        import sys
-        captured_output = io.StringIO()
-        sys.stdout = captured_output
-        tt.print_truth_table()
-        sys.stdout = sys.__stdout__
-        output = captured_output.getvalue()
-        self.assertIn("Таблица истинности пуста", output)
-
-    def test_print_truth_table_constant(self):
-        """Тест вывода константной функции"""
-        tt = TruthTableGenerator("1")
-        import io
-        import sys
-        captured_output = io.StringIO()
-        sys.stdout = captured_output
-        tt.print_truth_table()
-        sys.stdout = sys.__stdout__
-        output = captured_output.getvalue()
-        self.assertIn("Константная функция", output)
+        tt = TruthTable(['a', 'b'], '!(a->b)', self.parser)
+        # a->b is 0 only when a=1,b=0; then ! makes it 1 only for (1,0)
+        ones = tt.get_ones_sets()
+        self.assertEqual(ones, [(1,0)])
 
 
 if __name__ == '__main__':
