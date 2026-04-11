@@ -36,19 +36,19 @@ class MinimizationCalculator:
                 else:
                     terms.append(self.variables[i])
         if for_sdnf:
-            return " ∧ ".join(terms) if terms else Constants.DEFAULT_OUTPUT_ONE
+            return f" {Constants.OP_AND_SYMBOL} ".join(terms) if terms else Constants.DEFAULT_OUTPUT_ONE
         else:
-            return " ∨ ".join(terms) if terms else Constants.DEFAULT_OUTPUT_ZERO
+            return f" {Constants.OP_OR_SYMBOL} ".join(terms) if terms else Constants.DEFAULT_OUTPUT_ZERO
 
     def _can_glue(self, term1: str, term2: str) -> bool:
         """Проверка возможности склеивания двух термов"""
-        diff_count = 0
+        diff_count = Constants.ZERO
 
         for i in range(self.n):
             if term1[i] != term2[i]:
-                diff_count += 1
+                diff_count += Constants.ONE
 
-        return diff_count == 1
+        return diff_count == Constants.ONE
 
     def _glue_terms(self, term1: str, term2: str) -> str:
         """Склеивание двух термов"""
@@ -76,9 +76,9 @@ class MinimizationCalculator:
                     terms.append(self.variables[i])
 
         if for_sdnf:
-            return " ∧ ".join(terms) if terms else Constants.DEFAULT_OUTPUT_ONE
+            return f" {Constants.OP_AND_SYMBOL} ".join(terms) if terms else Constants.DEFAULT_OUTPUT_ONE
         else:
-            return " ∨ ".join(terms) if terms else Constants.DEFAULT_OUTPUT_ZERO
+            return f" {Constants.OP_OR_SYMBOL} ".join(terms) if terms else Constants.DEFAULT_OUTPUT_ZERO
 
     def _minimize_sdnf(self):
         """Минимизация по СДНФ (по единицам)"""
@@ -94,18 +94,18 @@ class MinimizationCalculator:
         current_terms = [self._term_to_binary(idx) for idx in self.sdnf_terms]
 
         initial_terms = [self._term_to_string(term) for term in current_terms]
-        print(f"Исходная СДНФ: {' ∨ '.join(['(' + term + ')' for term in initial_terms])}")
+        print(f"Исходная СДНФ: {f' {Constants.OP_OR_SYMBOL} '.join(['(' + term + ')' for term in initial_terms])}")
 
-        stage_num = 1
+        stage_num = Constants.ONE
         self.implicants = []
         glue_stages = []
 
-        while len(current_terms) > 0:
+        while len(current_terms) > Constants.ZERO:
             new_terms = []
             used = [False] * len(current_terms)
 
             for i in range(len(current_terms)):
-                for j in range(i + 1, len(current_terms)):
+                for j in range(i + Constants.ONE, len(current_terms)):
                     if self._can_glue(current_terms[i], current_terms[j]):
                         glued = self._glue_terms(current_terms[i], current_terms[j])
                         if glued not in new_terms:
@@ -122,20 +122,17 @@ class MinimizationCalculator:
                 for term in new_terms:
                     term_str = self._get_implicant_string(term)
                     new_terms_str.append(term_str)
-                print(f"Этап склеивания {stage_num}: {' ∨ '.join(['(' + t + ')' for t in new_terms_str])}")
-                stage_num += 1
+                print(f"Этап склеивания {stage_num}: {f' {Constants.OP_OR_SYMBOL} '.join(['(' + t + ')' for t in new_terms_str])}")
+                stage_num += Constants.ONE
 
             current_terms = new_terms
 
         if self.implicants:
-            prime_implicants = [self._get_implicant_string(imp) for imp in self.implicants]
-            print(f"Все простые импликанты: {' ∨ '.join(['(' + t + ')' for t in prime_implicants])}")
 
             self._remove_redundant_implicants()
 
             essential_implicants = [self._get_implicant_string(imp) for imp in self.implicants]
-            print(f"Существенные импликанты: {' ∨ '.join(['(' + t + ')' for t in essential_implicants])}")
-            self.sdnf_result = ' ∨ '.join(['(' + t + ')' for t in essential_implicants])
+            self.sdnf_result = f' {Constants.OP_OR_SYMBOL} '.join(['(' + t + ')' for t in essential_implicants])
         else:
             self.sdnf_result = Constants.DEFAULT_OUTPUT_ZERO
 
@@ -159,19 +156,19 @@ class MinimizationCalculator:
         current_terms = [self._term_to_binary(idx) for idx in zeros_indices]
 
         initial_terms = [self._term_to_string(term, for_sdnf=False) for term in current_terms]
-        print(f"Исходная СКНФ: {' ∧ '.join(['(' + term + ')' for term in initial_terms])}")
+        print(f"Исходная СКНФ: {f' {Constants.OP_AND_SYMBOL} '.join(['(' + term + ')' for term in initial_terms])}")
 
-        stage_num = 1
+        stage_num = Constants.ONE
         sknf_implicants = []
 
         working_terms = current_terms.copy()
 
-        while len(working_terms) > 0:
+        while len(working_terms) > Constants.ZERO:
             new_terms = []
             used = [False] * len(working_terms)
 
             for i in range(len(working_terms)):
-                for j in range(i + 1, len(working_terms)):
+                for j in range(i + Constants.ONE, len(working_terms)):
                     if self._can_glue(working_terms[i], working_terms[j]):
                         glued = self._glue_terms(working_terms[i], working_terms[j])
                         if glued not in new_terms:
@@ -188,15 +185,15 @@ class MinimizationCalculator:
                 for term in new_terms:
                     term_str = self._get_implicant_string(term, for_sdnf=False)
                     new_terms_str.append(term_str)
-                print(f"Этап склеивания {stage_num}: {' ∧ '.join(['(' + t + ')' for t in new_terms_str])}")
-                stage_num += 1
+                print(f"Этап склеивания {stage_num}: {f' {Constants.OP_AND_SYMBOL} '.join(['(' + t + ')' for t in new_terms_str])}")
+                stage_num += Constants.ONE
 
             working_terms = new_terms
 
-        if len(sknf_implicants) == 1 and sknf_implicants[0].count(Constants.BINARY_X) == self.n:
+        if len(sknf_implicants) == Constants.ONE and sknf_implicants[Constants.ZERO_INDEX].count(Constants.BINARY_X) == self.n:
             print("СКНФ уже минимальна (состоит из одного терма)")
             result_terms = [self._get_implicant_string(imp, for_sdnf=False) for imp in sknf_implicants]
-            self.sknf_result = ' ∧ '.join(['(' + t + ')' for t in result_terms])
+            self.sknf_result = f' {Constants.OP_AND_SYMBOL} '.join(['(' + t + ')' for t in result_terms])
         else:
             essential = []
             for i, imp in enumerate(sknf_implicants):
@@ -217,7 +214,7 @@ class MinimizationCalculator:
 
             sknf_implicants = essential if essential else sknf_implicants
             result_terms = [self._get_implicant_string(imp, for_sdnf=False) for imp in sknf_implicants]
-            self.sknf_result = ' ∧ '.join(['(' + t + ')' for t in result_terms])
+            self.sknf_result = f' {Constants.OP_AND_SYMBOL} '.join(['(' + t + ')' for t in result_terms])
 
         print(f"Результат минимизации по СКНФ: {self.sknf_result}")
 
@@ -257,19 +254,13 @@ class MinimizationCalculator:
         self._minimize_sdnf()
         self._minimize_sknf()
 
-        print("\n" + Constants.LINE[:50])
-        print("    Лучший результат")
-        print(Constants.LINE[:50])
-
         sdnf_len = len(self.sdnf_result.replace(' ', ''))
         sknf_len = len(self.sknf_result.replace(' ', ''))
 
         if sdnf_len <= sknf_len:
             self.best_result = self.sdnf_result
-            print(f"Лучший результат (по СДНФ): {self.best_result}")
         else:
             self.best_result = self.sknf_result
-            print(f"Лучший результат (по СКНФ): {self.best_result}")
 
     def get_minimized_function(self) -> str:
         """Получение минимизированной функции"""
