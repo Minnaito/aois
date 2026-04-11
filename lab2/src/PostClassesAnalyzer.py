@@ -22,19 +22,19 @@ class PostClassesAnalyzer:
 
     def _check_t0(self) -> bool:
         """Проверка принадлежности к T0 (сохраняет 0)"""
-        # Первая строка таблицы - все переменные = 0
-        return self.truth_table[0]['output'] == 0
+        return self.truth_table[Constants.ZERO_INDEX][Constants.OUTPUT_KEY] == Constants.ZERO
 
     def _check_t1(self) -> bool:
         """Проверка принадлежности к T1 (сохраняет 1)"""
-        # Последняя строка таблицы - все переменные = 1
-        return self.truth_table[-1]['output'] == 1
+        return self.truth_table[-Constants.FIRST_INDEX][Constants.OUTPUT_KEY] == Constants.ONE
 
     def _check_s(self) -> bool:
         """Проверка самодвойственности"""
         n = len(self.truth_table)
-        for i in range(n // Constants.POWER_BASE):
-            if self.truth_table[i]['output'] == self.truth_table[n - 1 - i]['output']:
+        if n == Constants.ONE:
+            return False
+        for i in range(n // Constants.TWO):
+            if self.truth_table[i][Constants.OUTPUT_KEY] == self.truth_table[n - Constants.ONE - i][Constants.OUTPUT_KEY]:
                 return False
         return True
 
@@ -42,22 +42,21 @@ class PostClassesAnalyzer:
         """Проверка монотонности"""
         n = len(self.variables)
         for i in range(len(self.truth_table)):
-            for j in range(i + 1, len(self.truth_table)):
-                # Проверяем, что i <= j покомпонентно
-                le = all(self.truth_table[i]['inputs'][k] <= self.truth_table[j]['inputs'][k]
+            for j in range(i + Constants.ONE, len(self.truth_table)):
+                le = all(self.truth_table[i][Constants.INPUTS_KEY][k] <= self.truth_table[j][Constants.INPUTS_KEY][k]
                          for k in range(n))
-                if le and self.truth_table[i]['output'] > self.truth_table[j]['output']:
+                if le and self.truth_table[i][Constants.OUTPUT_KEY] > self.truth_table[j][Constants.OUTPUT_KEY]:
                     return False
         return True
 
     def _check_l(self) -> bool:
         """Проверка линейности"""
-        values = [row['output'] for row in self.truth_table]
+        values = [row[Constants.OUTPUT_KEY] for row in self.truth_table]
         coefficients = self._build_zhegalkin_coefficients(values)
 
         n = len(self.variables)
-        for mask in range(1 << n):
-            if bin(mask).count(Constants.BINARY_ONE) > 1 and coefficients[mask] != 0:
+        for mask in range(Constants.POWER_BASE ** n):
+            if bin(mask).count(Constants.BINARY_ONE) > Constants.ONE and coefficients[mask] != Constants.ZERO:
                 return False
         return True
 
@@ -83,11 +82,16 @@ class PostClassesAnalyzer:
         class_names = {
             Constants.CLASS_T0: 'T0 (сохраняет 0)',
             Constants.CLASS_T1: 'T1 (сохраняет 1)',
-            Constants.CLASS_S: 'S (самодвойственная)',
+            Constants.CLASS_L: 'L (линейная)',
             Constants.CLASS_M: 'M (монотонная)',
-            Constants.CLASS_L: 'L (линейная)'
+            Constants.CLASS_S: 'S (самодвойственная)'
         }
 
-        for class_id, belongs in self.results.items():
-            status = "✓ принадлежит" if belongs else "✗ не принадлежит"
-            print(f"  {class_names[class_id]}: {status}")
+        order = [Constants.CLASS_T0, Constants.CLASS_T1, Constants.CLASS_L,
+                 Constants.CLASS_M, Constants.CLASS_S]
+
+        print("\nT0\tT1\tL\tM\tS")
+        symbols = []
+        for class_id in order:
+            symbols.append("+" if self.results[class_id] else "-")
+        print("\t".join(symbols))
