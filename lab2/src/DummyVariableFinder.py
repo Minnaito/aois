@@ -19,7 +19,6 @@ class DummyVariableFinder:
                 self.dummy_variables.append(self.variables[i])
 
     def _is_dummy(self, var_index: int) -> bool:
-        """Проверка, является ли переменная фиктивной"""
         n = len(self.variables)
         groups = {}
 
@@ -36,7 +35,7 @@ class DummyVariableFinder:
             groups[key][value] = output
 
         for key, outputs in groups.items():
-            if 0 in outputs and 1 in outputs and outputs[0] != outputs[1]:
+            if Constants.ZERO in outputs and Constants.ONE in outputs and outputs[Constants.ZERO] != outputs[Constants.ONE]:
                 return False
 
         return True
@@ -48,9 +47,8 @@ class DummyVariableFinder:
     def print_results(self):
         """Вывод результатов"""
         if self.dummy_variables:
-            print(Constants.format_error(Constants.MSG_DUMMY_FOUND,
-                                        vars=', '.join(self.dummy_variables)))
-            print(Constants.MSG_DUMMY_DESC)
+            print(f"\nФиктивные переменные: {', '.join(self.dummy_variables)}")
+            print("  (Эти переменные не влияют на значение функции)")
         else:
-            print(Constants.MSG_NO_DUMMY)
-            print(Constants.MSG_ALL_VARS_ESSENTIAL)
+            print("\nФиктивные переменные не обнаружены")
+            print("  (Все переменные существенно влияют на функцию)")
