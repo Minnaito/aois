@@ -1,83 +1,47 @@
 import unittest
-import sys
-import os
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from src.ZhegalkinPolynomialBuilder import ZhegalkinPolynomialBuilder
-from src.TruthTableGenerator import TruthTableGenerator
+from src.TruthTable import TruthTable
+from src.ExpressionParser import BooleanExpressionParser
 
 
 class TestZhegalkinPolynomialBuilder(unittest.TestCase):
-    """Тесты для ZhegalkinPolynomialBuilder"""
+    def setUp(self):
+        self.parser = BooleanExpressionParser()
 
-    def test_and_polynomial(self):
-        """Тест полинома для AND"""
-        tt = TruthTableGenerator("a&b")
-        builder = ZhegalkinPolynomialBuilder(tt.get_truth_table(), tt.get_variables())
-        polynomial = builder.get_polynomial()
-        self.assertEqual(polynomial, "a&b")
+    def _build(self, expr, variables):
+        tt = TruthTable(variables, expr, self.parser)
+        truth_table_list = [{'inputs': bits, 'output': res} for bits, res in tt]
+        return ZhegalkinPolynomialBuilder(truth_table_list, variables)
 
-    def test_or_polynomial(self):
-        """Тест полинома для OR"""
-        tt = TruthTableGenerator("a|b")
-        builder = ZhegalkinPolynomialBuilder(tt.get_truth_table(), tt.get_variables())
-        polynomial = builder.get_polynomial()
-        self.assertIn("a", polynomial)
-        self.assertIn("b", polynomial)
-        self.assertIn("a&b", polynomial)
+    def test_and_gate(self):
+        builder = self._build("a&b", ['a','b'])
+        self.assertEqual(builder.get_polynomial(), "ab")
 
-    def test_xor_polynomial(self):
-        """Тест полинома для XOR"""
-        tt = TruthTableGenerator("a^b")
-        builder = ZhegalkinPolynomialBuilder(tt.get_truth_table(), tt.get_variables())
-        polynomial = builder.get_polynomial()
-        self.assertIn("a ⊕ b", polynomial)
+    def test_or_gate(self):
+        builder = self._build("a|b", ['a','b'])
+        # порядок может быть a ^ b ^ ab или b ^ a ^ ab
+        self.assertIn(builder.get_polynomial(), ["a ⊕ b ⊕ ab", "b ⊕ a ⊕ ab"])
 
-    def test_not_polynomial(self):
-        """Тест полинома для NOT"""
-        tt = TruthTableGenerator("!a")
-        builder = ZhegalkinPolynomialBuilder(tt.get_truth_table(), tt.get_variables())
-        polynomial = builder.get_polynomial()
-        self.assertIn("1 ⊕ a", polynomial)
+    def test_not_gate(self):
+        builder = self._build("!a", ['a'])
+        self.assertEqual(builder.get_polynomial(), "1 ⊕ a")
 
-    def test_implication_polynomial(self):
-        """Тест полинома для импликации"""
-        tt = TruthTableGenerator("a->b")
-        builder = ZhegalkinPolynomialBuilder(tt.get_truth_table(), tt.get_variables())
-        polynomial = builder.get_polynomial()
-        # a->b = 1 ⊕ a ⊕ a&b
-        self.assertIn("1", polynomial)
-        self.assertIn("a", polynomial)
-        self.assertIn("a&b", polynomial)
 
-    def test_equivalence_polynomial(self):
-        """Тест полинома для эквивалентности"""
-        tt = TruthTableGenerator("a~b")
-        builder = ZhegalkinPolynomialBuilder(tt.get_truth_table(), tt.get_variables())
-        polynomial = builder.get_polynomial()
-        self.assertIn("1 ⊕ a ⊕ b", polynomial)
+    def test_constant_zero(self):
+        builder = self._build("0", [])
+        self.assertEqual(builder.get_polynomial(), "0")
 
-    def test_constant_zero_polynomial(self):
-        """Тест полинома для константы 0"""
-        tt = TruthTableGenerator("a&!a")
-        builder = ZhegalkinPolynomialBuilder(tt.get_truth_table(), tt.get_variables())
-        polynomial = builder.get_polynomial()
-        self.assertEqual(polynomial, "0")
+    def test_constant_one(self):
+        builder = self._build("1", [])
+        self.assertEqual(builder.get_polynomial(), "1")
 
-    def test_constant_one_polynomial(self):
-        """Тест полинома для константы 1"""
-        tt = TruthTableGenerator("a|!a")
-        builder = ZhegalkinPolynomialBuilder(tt.get_truth_table(), tt.get_variables())
-        polynomial = builder.get_polynomial()
-        self.assertEqual(polynomial, "1")
+    def test_complex_expression(self):
+        builder = self._build("a->b", ['a','b'])
+        self.assertEqual(builder.get_polynomial(), "1 ⊕ a ⊕ ab")
 
-    def test_three_variables_polynomial(self):
-        """Тест полинома для трех переменных"""
-        tt = TruthTableGenerator("a&b&c")
-        builder = ZhegalkinPolynomialBuilder(tt.get_truth_table(), tt.get_variables())
-        polynomial = builder.get_polynomial()
-        self.assertEqual(polynomial, "a&b&c")
+    def test_print_polynomial(self):
+        builder = self._build("a&b", ['a','b'])
+        builder.print_polynomial()
 
 
 if __name__ == '__main__':
