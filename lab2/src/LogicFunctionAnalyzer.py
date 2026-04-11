@@ -2,7 +2,11 @@
 
 import sys
 import os
-from src.TruthTableGenerator import TruthTableGenerator
+from src.constants import Constants
+
+from src.BooleanFunction import BooleanFunction
+from src.ExpressionParser import BooleanExpressionParser
+from src.TruthTable import TruthTable
 from src.NormalFormsBuilder import NormalFormsBuilder
 from src.PostClassesAnalyzer import PostClassesAnalyzer
 from src.ZhegalkinPolynomialBuilder import ZhegalkinPolynomialBuilder
@@ -11,7 +15,6 @@ from src.BooleanDerivativeCalculator import BooleanDerivativeCalculator
 from src.MinimizationCalculator import MinimizationCalculator
 from src.MinimizationTabular import MinimizationTabular
 from src.KarnaughMapMinimizer import KarnaughMapMinimizer
-from src.constants import Constants
 
 
 class LogicFunctionAnalyzer:
@@ -24,6 +27,7 @@ class LogicFunctionAnalyzer:
         self.sdnf_terms = []
         self.sknf_terms = []
         self.normal_forms_builder = None
+        self.boolean_function = None
 
     def clear_screen(self):
         """Очистка экрана"""
@@ -34,7 +38,7 @@ class LogicFunctionAnalyzer:
 
     def wait_for_enter(self):
         """Ожидание нажатия Enter"""
-        input(Constants.MSG_PRESS_ENTER)
+        input("Нажмите Enter для продолжения...")
 
     def print_header(self, title):
         """Вывод заголовка"""
@@ -49,7 +53,7 @@ class LogicFunctionAnalyzer:
     def input_function(self):
         """Ввод логической функции"""
         self.clear_screen()
-        self.print_header(Constants.HEADER_INPUT)
+        self.print_header("ВВОД ЛОГИЧЕСКОЙ ФУНКЦИИ")
 
         print("\nДоступные операции:")
         print(f"  {Constants.OP_NOT}  - отрицание (NOT)")
@@ -65,135 +69,159 @@ class LogicFunctionAnalyzer:
         print(f"  {Constants.EXAMPLE_4}")
 
         while True:
-            expr = input(Constants.MSG_ENTER_FUNCTION).strip()
+            expr = input("Введите логическую функцию: ").strip()
             if expr:
                 self.expression = expr
                 break
-            print(Constants.ERROR_EMPTY_FUNCTION)
+            print("Функция не может быть пустой!")
 
         try:
-            tt_generator = TruthTableGenerator(self.expression)
-            self.variables = tt_generator.get_variables()
-            self.truth_table = tt_generator.get_truth_table()
-
+            self.boolean_function = BooleanFunction(self.expression)
+            self.variables = self.boolean_function.variables
+            self.truth_table = self._convert_truth_table_format()
             self.normal_forms_builder = NormalFormsBuilder(self.truth_table, self.variables)
             self.sdnf_terms, self.sknf_terms = self.normal_forms_builder.get_numeric_forms()
-
             return True
 
-        except Exception as e:
-            print(Constants.format_error(Constants.ERROR_LOAD_FUNCTION, error=str(e)))
+        except ValueError as e:
+            print(f"Ошибка при загрузке функции: {e}")
             self.wait_for_enter()
             return False
+        except Exception as e:
+            print(f"Ошибка при загрузке функции: {e}")
+            self.wait_for_enter()
+            return False
+
+    def _convert_truth_table_format(self):
+        """Преобразование таблицы истинности в формат, совместимый с существующими классами"""
+        if self.boolean_function is None:
+            return []
+
+        converted_table = []
+        for bits, result in self.boolean_function.truth_table:
+            row = {
+                'inputs': bits,
+                'output': result
+            }
+            converted_table.append(row)
+        return converted_table
 
     def analyze_function(self):
         """Полный анализ функции"""
         self.clear_screen()
-        self.print_header(Constants.format_error(Constants.HEADER_ANALYSIS, func=self.expression))
+        self.print_header(f"АНАЛИЗ ФУНКЦИИ: {self.expression}")
 
-        # 1. Таблица истинности
-        print(f"\n{Constants.HEADER_TRUTH_TABLE}")
+        print("\n1. ТАБЛИЦА ИСТИННОСТИ:")
         self.print_separator()
-        tt_generator = TruthTableGenerator(self.expression)
-        tt_generator.print_truth_table()
+        self._print_truth_table()
 
-        # 2. СДНФ и СКНФ
-        print(f"\n{Constants.HEADER_NORMAL_FORMS}")
+        print("\n2. СОВЕРШЕННЫЕ НОРМАЛЬНЫЕ ФОРМЫ:")
         self.print_separator()
         self.normal_forms_builder.print_forms()
 
-        # 3. Классы Поста
-        print(f"\n{Constants.HEADER_POST_CLASSES}")
+        print("\n3. КЛАССЫ ПОСТА:")
         self.print_separator()
         post_analyzer = PostClassesAnalyzer(self.truth_table, self.variables)
         post_analyzer.print_results()
 
-        # 4. Полином Жегалкина
-        print(f"\n{Constants.HEADER_ZHEGALKIN}")
+        print("\n4. ПОЛИНОМ ЖЕГАЛКИНА:")
         self.print_separator()
         zhegalkin_builder = ZhegalkinPolynomialBuilder(self.truth_table, self.variables)
         zhegalkin_builder.print_polynomial()
 
-        # 5. Фиктивные переменные
-        print(f"\n{Constants.HEADER_DUMMY}")
+        print("\n5. ФИКТИВНЫЕ ПЕРЕМЕННЫЕ:")
         self.print_separator()
         dummy_finder = DummyVariableFinder(self.truth_table, self.variables)
         dummy_finder.print_results()
 
-        # 6. Булевы производные
-        print(f"\n{Constants.HEADER_DERIVATIVES}")
+        print("\n6. БУЛЕВЫ ПРОИЗВОДНЫЕ:")
         self.print_separator()
         derivative_calc = BooleanDerivativeCalculator(self.truth_table, self.variables)
+        derivative_calc.print_all(max_order=Constants.FOUR)
 
-        if len(self.variables) >= Constants.MIN_VARS_FOR_PARTIAL:
-            print("\nЧастные производные:")
-            for var in self.variables:
-                deriv = derivative_calc.partial(var)
-                print(f"  ∂f/∂{var} = {deriv}")
-
-        if len(self.variables) >= Constants.MIN_VARS_FOR_MIXED:
-            print("\nСмешанные производные (по 2 переменным):")
-            for i in range(len(self.variables)):
-                for j in range(i + Constants.ONE, len(self.variables)):
-                    deriv = derivative_calc.mixed(self.variables[i], self.variables[j])
-                    print(f"  ∂²f/∂{self.variables[i]}∂{self.variables[j]} = {deriv}")
-
-        # 7. Минимизация расчетным методом
-        print(f"\n{Constants.HEADER_MINIMIZATION_CALC}")
+        print("\n7. МИНИМИЗАЦИЯ РАСЧЕТНЫМ МЕТОДОМ:")
         self.print_separator()
         if self.sdnf_terms:
             minimizer_calc = MinimizationCalculator(self.sdnf_terms, self.variables)
             minimizer_calc.print_result()
         else:
-            print(f"\n{Constants.MSG_ZERO_FUNCTION}")
+            print("\nФункция тождественно равна 0, минимизация не требуется")
 
-        # 8. Минимизация расчетно-табличным методом
-        print(f"\n{Constants.HEADER_MINIMIZATION_TAB}")
+        print("\n8. МИНИМИЗАЦИЯ РАСЧЕТНО-ТАБЛИЧНЫМ МЕТОДОМ:")
         self.print_separator()
-        if self.sdnf_terms:
-            minimizer_tab = MinimizationTabular(self.sdnf_terms, self.variables)
-            minimizer_tab.print_result()
-        else:
-            print(f"\n{Constants.MSG_ZERO_FUNCTION}")
 
-        # 9. Минимизация картами Карно
-        print(f"\n{Constants.HEADER_MINIMIZATION_KMAP}")
+        if self.sdnf_terms:
+            print(f"\n{Constants.LINE}")
+            print("МИНИМИЗАЦИЯ ПО СДНФ (единицы функции)")
+            print(Constants.LINE)
+            minimizer_tab_sdnf = MinimizationTabular(self.sdnf_terms, self.variables, is_sdnf=True)
+            minimizer_tab_sdnf.print_result()
+
+            print("\n")
+
+            print(f"\n{Constants.LINE}")
+            print("МИНИМИЗАЦИЯ ПО СКНФ (нули функции)")
+            print(Constants.LINE)
+            zeros_indices = list(set(range(Constants.POWER_BASE ** len(self.variables))) - set(self.sdnf_terms))
+            if zeros_indices:
+                minimizer_tab_sknf = MinimizationTabular(zeros_indices, self.variables, is_sdnf=False)
+                minimizer_tab_sknf.print_result()
+            else:
+                print("\nРезультат минимизации (СКНФ): 1")
+        else:
+            print("\nФункция тождественно равна 0, минимизация не требуется")
+
+        print("\n9. МИНИМИЗАЦИЯ МЕТОДОМ КАРТ КАРНО:")
         self.print_separator()
         kmap_minimizer = KarnaughMapMinimizer(self.truth_table, self.variables)
         kmap_minimizer.print_kmap()
 
         print("\n" + Constants.LINE)
-        print(Constants.HEADER_ANALYSIS_END)
+        print(" АНАЛИЗ ЗАВЕРШЕН")
         print(Constants.LINE)
+
+    def _print_truth_table(self):
+        """Вывод таблицы истинности"""
+        if self.boolean_function is None:
+            print("Таблица истинности не построена")
+            return
+
+        header = " | ".join(self.variables) + " | F"
+        print(f"  {header}")
+        print(f"  {'-' * len(header)}")
+
+        for bits, result in self.boolean_function.truth_table:
+            row = " | ".join(str(b) for b in bits)
+            print(f"  {row} | {result}")
 
     def run(self):
         """Запуск программы"""
         while True:
             self.clear_screen()
             print(Constants.LINE)
-            print(f"          {Constants.MENU_TITLE}")
+            print("          АНАЛИЗАТОР ЛОГИЧЕСКИХ ФУНКЦИЙ")
             print(Constants.LINE)
             print("\nГЛАВНОЕ МЕНЮ:")
             print(Constants.SEPARATOR)
-            print(f" {Constants.MENU_OPTION_1}")
-            print(f" {Constants.MENU_OPTION_2}")
+            print(" 1. Ввести логическую функцию и выполнить полный анализ")
+            print(" 2. Выход из программы")
             print(Constants.SEPARATOR)
 
             choice = input("\nВыберите пункт меню (1-2): ").strip()
 
-            if choice == Constants.MENU_CHOICE_1:
+            if choice == '1':
                 if self.input_function():
                     self.analyze_function()
-                    print(Constants.MSG_ANALYSIS_COMPLETE)
+                    print("Анализ завершен. Нажмите Enter для возврата в меню...")
                     input()
-            elif choice == Constants.MENU_CHOICE_2:
+            elif choice == '2':
                 self.clear_screen()
                 print("\n" + Constants.LINE)
-                print(f"          {Constants.MSG_THANK_YOU}")
+                print("          Спасибо за использование программы!")
                 print(Constants.LINE + "\n")
                 sys.exit(Constants.EXIT_SUCCESS)
             else:
-                print(Constants.ERROR_INVALID_CHOICE)
+                print("Неверный выбор! Пожалуйста, выберите 1 или 2.")
                 self.wait_for_enter()
 
 
@@ -203,7 +231,7 @@ def main():
         analyzer = LogicFunctionAnalyzer()
         analyzer.run()
     except KeyboardInterrupt:
-        print(f"\n\n{Constants.MSG_PROGRAM_INTERRUPTED}")
+        print("\n\nПрограмма прервана пользователем.")
         sys.exit(Constants.EXIT_SUCCESS)
 
 
