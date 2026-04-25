@@ -11,66 +11,24 @@ class KarnaughMapMinimizer:
         self.size = Constants.POWER_BASE ** self.n
         self.map = self._build_kmap()
 
-    def _get_output(self, item):
-        """Извлечение значения выхода из элемента таблицы истинности"""
+    # ---------- Вспомогательные функции ----------
+    @staticmethod
+    def _get_output(item):
         if isinstance(item, dict):
             return int(item.get(Constants.OUTPUT_KEY, Constants.ZERO))
         return int(item)
 
-    def _build_kmap(self):
-        """Создание карты Карно соответствующей размерности"""
-        if self.n == Constants.ONE:
-            return [self._get_output(self.truth_table[i]) for i in range(Constants.POWER_BASE)]
-        elif self.n == Constants.TWO:
-            kmap = [[Constants.ZERO, Constants.ZERO], [Constants.ZERO, Constants.ZERO]]
-            for i in range(Constants.FOUR):
-                row = (i >> Constants.ONE) & Constants.ONE
-                col = i & Constants.ONE
-                kmap[row][col] = self._get_output(self.truth_table[i])
-            return kmap
-        elif self.n == Constants.THREE:
-            kmap = [[Constants.ZERO, Constants.ZERO, Constants.ZERO, Constants.ZERO] for _ in range(Constants.TWO)]
-            for i in range(Constants.POWER_BASE ** Constants.THREE):
-                row = (i >> Constants.TWO) & Constants.ONE
-                bc = i & Constants.THREE
-                col = bc ^ (bc >> Constants.ONE)
-                kmap[row][col] = self._get_output(self.truth_table[i])
-            return kmap
-        elif self.n == Constants.FOUR:
-            kmap = [[Constants.ZERO, Constants.ZERO, Constants.ZERO, Constants.ZERO] for _ in range(Constants.FOUR)]
-            for i in range(Constants.POWER_BASE ** Constants.FOUR):
-                ab = (i >> Constants.TWO) & Constants.THREE
-                cd = i & Constants.THREE
-                row = ab ^ (ab >> Constants.ONE)
-                col = cd ^ (cd >> Constants.ONE)
-                kmap[row][col] = self._get_output(self.truth_table[i])
-            return kmap
-        elif self.n == Constants.FIVE:
-            kmap = [[[Constants.ZERO, Constants.ZERO, Constants.ZERO, Constants.ZERO] for _ in range(Constants.FOUR)] for _ in range(Constants.TWO)]
-            for i in range(Constants.POWER_BASE ** Constants.FIVE):
-                e = i & Constants.ONE
-                abcd = (i >> Constants.ONE) & Constants.POWER_BASE ** Constants.FOUR - Constants.ONE  # 15
-                ab = (abcd >> Constants.TWO) & Constants.THREE
-                cd = abcd & Constants.THREE
-                row = ab ^ (ab >> Constants.ONE)
-                col = cd ^ (cd >> Constants.ONE)
-                kmap[e][row][col] = self._get_output(self.truth_table[i])
-            return kmap
-        else:
-            raise ValueError("Поддерживается до 5 переменных")
-
     def _get_dimensions(self):
-        """Возвращает (rows, cols, layers) для текущей карты"""
         if self.n == Constants.ONE:
-            return (Constants.TWO, Constants.ONE, Constants.ONE)
+            return Constants.TWO, Constants.ONE, Constants.ONE
         elif self.n == Constants.TWO:
-            return (Constants.TWO, Constants.TWO, Constants.ONE)
+            return Constants.TWO, Constants.TWO, Constants.ONE
         elif self.n == Constants.THREE:
-            return (Constants.TWO, Constants.FOUR, Constants.ONE)
+            return Constants.TWO, Constants.FOUR, Constants.ONE
         elif self.n == Constants.FOUR:
-            return (Constants.FOUR, Constants.FOUR, Constants.ONE)
-        else:  # n == 5
-            return (Constants.FOUR, Constants.FOUR, Constants.TWO)
+            return Constants.FOUR, Constants.FOUR, Constants.ONE
+        else:  # 5 переменных
+            return Constants.FOUR, Constants.FOUR, Constants.TWO
 
     @staticmethod
     def _gray_to_bin(gray, bits):
@@ -83,14 +41,9 @@ class KarnaughMapMinimizer:
         return bin_val
 
     def _cell_to_input_vector(self, cell):
-        """
-        Преобразование координат клетки в вектор значений переменных (0/1).
-        cell: для n<=4 - (row, col); для n=5 - (layer, row, col)
-        """
         rows, cols, layers = self._get_dimensions()
         if self.n == Constants.ONE:
-            row = cell[Constants.ZERO_INDEX]
-            return [row]
+            return [cell[Constants.ZERO_INDEX]]
         elif self.n == Constants.TWO:
             row, col = cell
             return [row, col]
@@ -102,103 +55,170 @@ class KarnaughMapMinimizer:
             row, col = cell
             ab = self._gray_to_bin(row, Constants.TWO)
             cd = self._gray_to_bin(col, Constants.TWO)
-            return [(ab >> Constants.ONE) & Constants.ONE, ab & Constants.ONE, (cd >> Constants.ONE) & Constants.ONE, cd & Constants.ONE]
+            return [(ab >> Constants.ONE) & Constants.ONE, ab & Constants.ONE,
+                    (cd >> Constants.ONE) & Constants.ONE, cd & Constants.ONE]
         else:  # n == 5
             layer, row, col = cell
             ab = self._gray_to_bin(row, Constants.TWO)
             cd = self._gray_to_bin(col, Constants.TWO)
-            return [(ab >> Constants.ONE) & Constants.ONE, ab & Constants.ONE, (cd >> Constants.ONE) & Constants.ONE, cd & Constants.ONE, layer]
+            return [(ab >> Constants.ONE) & Constants.ONE, ab & Constants.ONE,
+                    (cd >> Constants.ONE) & Constants.ONE, cd & Constants.ONE, layer]
 
+    def _get_cell_value(self, cell):
+        """Возвращает значение клетки по координатам с учётом размерности."""
+        rows, cols, layers = self._get_dimensions()
+        if layers == Constants.ONE:
+            return self.map[cell[0]][cell[1]] if len(cell) == 2 else self.map[cell[0]]
+        else:
+            layer, row, col = cell
+            return self.map[layer][row][col]
+
+    # ---------- Построение карты Карно ----------
+    def _build_kmap(self):
+        if self.n == Constants.ONE:
+            return self._build_kmap_1()
+        elif self.n == Constants.TWO:
+            return self._build_kmap_2()
+        elif self.n == Constants.THREE:
+            return self._build_kmap_3()
+        elif self.n == Constants.FOUR:
+            return self._build_kmap_4()
+        elif self.n == Constants.FIVE:
+            return self._build_kmap_5()
+        else:
+            raise ValueError("Поддерживается до 5 переменных")
+
+    def _build_kmap_1(self):
+        return [self._get_output(self.truth_table[i]) for i in range(Constants.POWER_BASE)]
+
+    def _build_kmap_2(self):
+        kmap = [[Constants.ZERO, Constants.ZERO], [Constants.ZERO, Constants.ZERO]]
+        for i in range(Constants.FOUR):
+            row = (i >> Constants.ONE) & Constants.ONE
+            col = i & Constants.ONE
+            kmap[row][col] = self._get_output(self.truth_table[i])
+        return kmap
+
+    def _build_kmap_3(self):
+        kmap = [[Constants.ZERO] * Constants.FOUR for _ in range(Constants.TWO)]
+        for i in range(Constants.POWER_BASE ** Constants.THREE):
+            row = (i >> Constants.TWO) & Constants.ONE
+            bc = i & Constants.THREE
+            col = bc ^ (bc >> Constants.ONE)
+            kmap[row][col] = self._get_output(self.truth_table[i])
+        return kmap
+
+    def _build_kmap_4(self):
+        kmap = [[Constants.ZERO] * Constants.FOUR for _ in range(Constants.FOUR)]
+        for i in range(Constants.POWER_BASE ** Constants.FOUR):
+            ab = (i >> Constants.TWO) & Constants.THREE
+            cd = i & Constants.THREE
+            row = ab ^ (ab >> Constants.ONE)
+            col = cd ^ (cd >> Constants.ONE)
+            kmap[row][col] = self._get_output(self.truth_table[i])
+        return kmap
+
+    def _build_kmap_5(self):
+        kmap = [[[Constants.ZERO] * Constants.FOUR for _ in range(Constants.FOUR)] for _ in range(Constants.TWO)]
+        mask = Constants.POWER_BASE ** Constants.FOUR - Constants.ONE
+        for i in range(Constants.POWER_BASE ** Constants.FIVE):
+            e = i & Constants.ONE
+            abcd = (i >> Constants.ONE) & mask
+            ab = (abcd >> Constants.TWO) & Constants.THREE
+            cd = abcd & Constants.THREE
+            row = ab ^ (ab >> Constants.ONE)
+            col = cd ^ (cd >> Constants.ONE)
+            kmap[e][row][col] = self._get_output(self.truth_table[i])
+        return kmap
+
+    # ---------- Поиск простых импликант ----------
     def _find_prime_implicants(self):
-        """Возвращает список простых импликант (максимальных прямоугольников из единиц)"""
         if self.map is None:
             return []
-
-        rows, cols, layers = self._get_dimensions()
-        prime_implicants = []
-
         if self.n == Constants.ONE:
-            for i in range(rows):
-                if self.map[i] == Constants.ONE:
-                    cells = {(i,)}
-                    term = self._cells_to_term(cells)
-                    if not self._has_contradiction(term):
-                        prime_implicants.append({
-                            'cells': cells,
-                            'term': term
-                        })
-            prime_implicants.sort(key=lambda x: len(x['cells']), reverse=True)
-            return prime_implicants
+            return self._prime_implicants_1()
+        return self._prime_implicants_n()
 
-        possible_heights = [h for h in [Constants.ONE, Constants.TWO, Constants.FOUR] if h <= rows]
-        possible_widths = [w for w in [Constants.ONE, Constants.TWO, Constants.FOUR] if w <= cols]
-
-        for height in possible_heights:
-            for width in possible_widths:
-                for layer in range(layers):
-                    for r in range(rows):
-                        for c in range(cols):
-                            cells = []
-                            all_ones = True
-                            for i in range(height):
-                                row_idx = (r + i) % rows
-                                for j in range(width):
-                                    col_idx = (c + j) % cols
-                                    if layers == Constants.ONE:
-                                        val = self.map[row_idx][col_idx]
-                                    else:
-                                        val = self.map[layer][row_idx][col_idx]
-
-                                    if val != Constants.ONE:
-                                        all_ones = False
-                                        break
-                                    cell = (row_idx, col_idx) if layers == Constants.ONE else (layer, row_idx, col_idx)
-                                    cells.append(cell)
-                                if not all_ones:
-                                    break
-                            if all_ones and cells:
-                                cells_set = set(cells)
-                                term = self._cells_to_term(cells_set)
-
-                                if self._has_contradiction(term):
-                                    continue
-
-                                if not any(cells_set.issubset(impl['cells']) for impl in prime_implicants):
-                                    # Удаляем те, которые являются подмножеством новой
-                                    prime_implicants = [impl for impl in prime_implicants
-                                                        if not impl['cells'].issubset(cells_set)]
-                                    prime_implicants.append({
-                                        'cells': cells_set,
-                                        'term': term
-                                    })
-
+    def _prime_implicants_1(self):
+        rows, _, _ = self._get_dimensions()
+        prime_implicants = []
+        for i in range(rows):
+            if self.map[i] == Constants.ONE:
+                cells = {(i,)}
+                term = self._cells_to_term(cells)
+                if not self._has_contradiction(term):
+                    prime_implicants.append({'cells': cells, 'term': term})
         prime_implicants.sort(key=lambda x: len(x['cells']), reverse=True)
         return prime_implicants
-    def _has_contradiction(self, term: str) -> bool:
-        """Проверяет, содержит ли терм противоречивые литералы (x и ¬x)"""
-        vars_positive = set()
-        vars_negative = set()
 
-        i = Constants.ZERO
-        while i < len(term):
-            if i + Constants.ONE < len(term) and term[i] == '¬':
-                vars_negative.add(term[i + Constants.ONE])
-                i += Constants.TWO
-            else:
-                vars_positive.add(term[i])
-                i += Constants.ONE
+    def _prime_implicants_n(self):
+        rows, cols, layers = self._get_dimensions()
+        prime_implicants = []
+        possible_heights = [h for h in [1, 2, 4] if h <= rows]
+        possible_widths = [w for w in [1, 2, 4] if w <= cols]
+        for height in possible_heights:
+            for width in possible_widths:
+                self._scan_rectangles(height, width, layers, rows, cols, prime_implicants)
+        prime_implicants.sort(key=lambda x: len(x['cells']), reverse=True)
+        return prime_implicants
 
-        return bool(vars_positive & vars_negative)
+    def _scan_rectangles(self, height, width, layers, rows, cols, prime_implicants):
+        for layer in range(layers):
+            for r in range(rows):
+                for c in range(cols):
+                    cells, all_ones = self._check_rect(layer, r, c, height, width, layers, rows, cols)
+                    if all_ones and cells:
+                        self._add_if_maximal(cells, prime_implicants)
 
+    def _check_rect(self, layer, r, c, height, width, layers, rows, cols):
+        cells = []
+        for i in range(height):
+            row_idx = (r + i) % rows
+            for j in range(width):
+                col_idx = (c + j) % cols
+                val = self._rect_value(layer, row_idx, col_idx, layers)
+                if val != Constants.ONE:
+                    return [], False
+                cell = (row_idx, col_idx) if layers == Constants.ONE else (layer, row_idx, col_idx)
+                cells.append(cell)
+        return cells, True
+
+    def _rect_value(self, layer, row_idx, col_idx, layers):
+        if layers == Constants.ONE:
+            return self.map[row_idx][col_idx]
+        return self.map[layer][row_idx][col_idx]
+
+    def _add_if_maximal(self, cells, prime_implicants):
+        cells_set = set(cells)
+        term = self._cells_to_term(cells_set)
+        if self._has_contradiction(term):
+            return
+        if not any(cells_set.issubset(imp['cells']) for imp in prime_implicants):
+            prime_implicants[:] = [imp for imp in prime_implicants if not imp['cells'].issubset(cells_set)]
+            prime_implicants.append({'cells': cells_set, 'term': term})
+
+    # ---------- Минимизация ДНФ ----------
     def _minimize_dnf(self, prime_implicants):
-        """Жадное покрытие единиц карты простыми импликантами"""
         if self.map is None:
             return "Ошибка"
+        ones = self._collect_ones()
+        if not ones:
+            return Constants.DEFAULT_OUTPUT_ZERO
+        if len(ones) == self._total_cells():
+            return Constants.DEFAULT_OUTPUT_ONE
+        selected_terms = self._essential_and_greedy(prime_implicants, ones)
+        terms = [imp['term'] for imp in selected_terms]
+        terms = [t for t in terms if t != Constants.DEFAULT_OUTPUT_ONE]
+        if not terms:
+            return Constants.DEFAULT_OUTPUT_ONE
+        simplified = self._simplify_dnf_terms(terms)
+        if len(simplified) == Constants.ONE:
+            return simplified[0]
+        return " ∨ ".join(simplified)
 
+    def _collect_ones(self):
         rows, cols, layers = self._get_dimensions()
-
         ones = []
-
         if self.n == Constants.ONE:
             for i in range(rows):
                 if self.map[i] == Constants.ONE:
@@ -207,215 +227,172 @@ class KarnaughMapMinimizer:
             for layer in range(layers):
                 for r in range(rows):
                     for c in range(cols):
-                        if layers == Constants.ONE:
-                            if self.map[r][c] == Constants.ONE:
-                                ones.append((r, c))
-                        else:
-                            if self.map[layer][r][c] == Constants.ONE:
-                                ones.append((layer, r, c))
+                        if self._rect_value(layer, r, c, layers) == Constants.ONE:
+                            ones.append((r, c) if layers == Constants.ONE else (layer, r, c))
+        return ones
 
-        if not ones:
-            return Constants.DEFAULT_OUTPUT_ZERO
-        total_cells = rows * cols * layers
-        if len(ones) == total_cells:
-            return Constants.DEFAULT_OUTPUT_ONE
+    def _total_cells(self):
+        rows, cols, layers = self._get_dimensions()
+        return rows * cols * layers
 
-        uncovered = set(ones)
-        selected_terms = []
-        selected_cells = []
-
-        for cell in ones:
-            covering_imps = [imp for imp in prime_implicants if cell in imp['cells']]
-            if len(covering_imps) == Constants.ONE:
-                imp = covering_imps[Constants.ZERO_INDEX]
-                if imp not in selected_terms:
-                    selected_terms.append(imp)
-                    selected_cells.append(imp)
+    def _essential_and_greedy(self, prime_implicants, must_cover):
+        # Существенные импликанты
+        uncovered = set(must_cover)
+        selected = []
+        for cell in must_cover:
+            covering = [imp for imp in prime_implicants if cell in imp['cells']]
+            if len(covering) == 1:
+                imp = covering[0]
+                if imp not in selected:
+                    selected.append(imp)
                     uncovered -= imp['cells']
-
+        # Жадное покрытие
         while uncovered:
-            best_impl = None
-            best_covered = set()
-            for impl in prime_implicants:
-                if impl in selected_cells:
-                    continue
-                covered = impl['cells'] & uncovered
-                if len(covered) > len(best_covered):
-                    best_covered = covered
-                    best_impl = impl
-
-            if best_impl is None or len(best_covered) == Constants.ZERO:
+            best = max(
+                (imp for imp in prime_implicants if imp not in selected),
+                key=lambda imp: len(imp['cells'] & uncovered),
+                default=None
+            )
+            if best is None or len(best['cells'] & uncovered) == 0:
                 break
+            selected.append(best)
+            uncovered -= best['cells']
+        return selected
 
-            selected_terms.append(best_impl)
-            selected_cells.append(best_impl)
-            uncovered -= best_covered
-
-        terms = [imp['term'] for imp in selected_terms]
-
-        terms = [t for t in terms if t != Constants.DEFAULT_OUTPUT_ONE]
-        if not terms:
-            return Constants.DEFAULT_OUTPUT_ONE
-
-        simplified = self._simplify_dnf_terms(terms)
-
-        if len(simplified) == Constants.ONE:
-            return simplified[Constants.ZERO_INDEX]
-        return " ∨ ".join(simplified)
-
+    # ---------- Упрощение термов ДНФ ----------
     def _simplify_dnf_terms(self, terms):
-        """Упрощение ДНФ путём поглощения и склеивания"""
         if not terms:
             return terms
-
-        parsed = []
-        for term in terms:
-            literals = set()
-            i = Constants.ZERO
-            while i < len(term):
-                if term[i] == Constants.OP_NOT:
-                    literals.add(term[i:i + Constants.TWO]) 
-                    i += Constants.TWO
-                else:
-                    literals.add(term[i]) 
-                    i += Constants.ONE
-            parsed.append((term, literals))
-
+        parsed = [self._parse_term(term) for term in terms]
+        # Поглощение и склеивание
         changed = True
         while changed:
             changed = False
-            to_remove = set()
-
-            for i in range(len(parsed)):
-                for j in range(len(parsed)):
-                    if i != j and parsed[i][Constants.FIRST_INDEX].issubset(parsed[j][Constants.FIRST_INDEX]):
-                        # i-й терм поглощает j-й
-                        to_remove.add(j)
-                        changed = True
-
-            if to_remove:
-                parsed = [parsed[k] for k in range(len(parsed)) if k not in to_remove]
+            parsed = self._absorption(parsed)
+            if parsed is False:
                 continue
-
-            for i in range(len(parsed)):
-                for j in range(i + Constants.ONE, len(parsed)):
-                    term1_lits = parsed[i][Constants.FIRST_INDEX]
-                    term2_lits = parsed[j][Constants.FIRST_INDEX]
-
-                    if len(term1_lits) == Constants.ONE:
-                        lit = list(term1_lits)[Constants.ZERO_INDEX]
-                        opposite = lit[Constants.FIRST_INDEX:] if lit.startswith(
-                            Constants.OP_NOT) else f"{Constants.OP_NOT}{lit}"
-                        if opposite in term2_lits:
-                            # Упрощаем второй терм, убирая отрицание
-                            new_lits = term2_lits - {opposite}
-                            if new_lits and not any(new_lits == p[Constants.FIRST_INDEX] for p in parsed):
-                                new_term = ''.join(sorted(new_lits, key=lambda x: (x.startswith(Constants.OP_NOT),
-                                                                                   x[-Constants.FIRST_INDEX])))
-                                parsed.append((new_term, new_lits))
-                                changed = True
-
-                    if len(term2_lits) == Constants.ONE:
-                        lit = list(term2_lits)[Constants.ZERO_INDEX]
-                        opposite = lit[Constants.FIRST_INDEX:] if lit.startswith(
-                            Constants.OP_NOT) else f"{Constants.OP_NOT}{lit}"
-                        if opposite in term1_lits:
-                            new_lits = term1_lits - {opposite}
-                            if new_lits and not any(new_lits == p[Constants.FIRST_INDEX] for p in parsed):
-                                new_term = ''.join(sorted(new_lits, key=lambda x: (x.startswith(Constants.OP_NOT),
-                                                                                   x[-Constants.FIRST_INDEX])))
-                                parsed.append((new_term, new_lits))
-                                changed = True
-
+            parsed, changed = self._combine_terms(parsed)
         result = []
         for term, lits in parsed:
-            if self._has_contradiction(term):
+            if self._has_contradiction(term) and term not in result:
                 continue
             if term not in result:
                 result.append(term)
-
         return result
 
+    def _parse_term(self, term):
+        literals = set()
+        i = 0
+        while i < len(term):
+            if term[i] == Constants.OP_NOT:
+                literals.add(term[i:i + 2])
+                i += 2
+            else:
+                literals.add(term[i])
+                i += 1
+        return term, literals
+
+    def _absorption(self, parsed):
+        new_parsed = parsed[:]
+        for i in range(len(new_parsed)):
+            for j in range(len(new_parsed)):
+                if i != j and new_parsed[i][1].issubset(new_parsed[j][1]):
+                    del new_parsed[j]
+                    return new_parsed  # перезапустим внешний цикл
+        return parsed
+
+    def _try_combine_pair(self, new_parsed, lits_a, lits_b):
+        """Если один из наборов — одиночный литерал, а другой содержит его отрицание,
+        порождает упрощённый набор (если его ещё нет). Возвращает True при добавлении."""
+        changed = False
+        for single_lits, other_lits in ((lits_a, lits_b), (lits_b, lits_a)):
+            if len(single_lits) == 1:
+                lit = list(single_lits)[0]
+                opp = lit[1:] if lit.startswith(Constants.OP_NOT) else Constants.OP_NOT + lit
+                if opp in other_lits:
+                    new_lits = other_lits - {opp}
+                    if new_lits:
+                        new_term = self._lits_to_str(new_lits)
+                        if not any(new_lits == p[1] for p in new_parsed):
+                            new_parsed.append((new_term, new_lits))
+                            changed = True
+            if changed:
+                return True  # достаточно одного добавления
+        return False
+
+    def _combine_terms(self, parsed):
+        new_parsed = parsed[:]
+        changed = False
+        for i in range(len(new_parsed)):
+            for j in range(i + 1, len(new_parsed)):
+                if self._try_combine_pair(new_parsed, new_parsed[i][1], new_parsed[j][1]):
+                    changed = True
+        return new_parsed, changed
+
+    def _lits_to_str(self, literals):
+        return ''.join(sorted(literals, key=lambda x: (x.startswith(Constants.OP_NOT), x[-1])))
+
+    # ---------- Преобразование клеток в терм ----------
     def _cells_to_term(self, cells):
-        """
-        Преобразование множества клеток в логический терм.
-        """
         if not cells:
             return Constants.DEFAULT_OUTPUT_ZERO
-
         if self.n == Constants.ONE:
-            vectors = []
-            for cell in cells:
-                vectors.append([cell[Constants.ZERO_INDEX]])
+            vectors = [[cell[0]] for cell in cells]
         else:
             vectors = [self._cell_to_input_vector(cell) for cell in cells]
-
         term_parts = []
         for var_idx, var_name in enumerate(self.variables):
             values = {vec[var_idx] for vec in vectors}
-            if len(values) == Constants.ONE:
+            if len(values) == 1:
                 val = values.pop()
-                if val == Constants.ONE:
-                    term_parts.append(var_name)
-                else:
-                    term_parts.append(f"{Constants.OP_NOT}{var_name}")
-
+                term_parts.append(var_name if val == Constants.ONE else f"{Constants.OP_NOT}{var_name}")
         if not term_parts:
             return Constants.DEFAULT_OUTPUT_ONE
-        elif len(term_parts) == Constants.ONE:
-            return term_parts[Constants.ZERO_INDEX]
-        else:
-            return "".join(term_parts)
+        if len(term_parts) == 1:
+            return term_parts[0]
+        return "".join(term_parts)
 
     def _has_contradiction(self, term: str) -> bool:
-        """Проверяет, содержит ли терм противоречивые литералы (x и !x)"""
-        vars_positive = set()
-        vars_negative = set()
-
-        i = Constants.ZERO
+        """Проверяет, содержит ли терм x и ¬x одновременно."""
+        pos = set()
+        neg = set()
+        i = 0
         while i < len(term):
             if term[i] == Constants.OP_NOT:
-                vars_negative.add(term[i + Constants.ONE])
-                i += Constants.TWO
+                neg.add(term[i + 1])
+                i += 2
             else:
-                vars_positive.add(term[i])
-                i += Constants.ONE
-        return bool(vars_positive & vars_negative)
+                pos.add(term[i])
+                i += 1
+        return bool(pos & neg)
 
-    def _simplify_term_with_others(self, term, all_terms):
-        """Упрощает терм, учитывая другие термы (e ∨ a¬e → e ∨ a)"""
-
-        if len(term) == Constants.ONE:
-            return term
-
-        single_vars = {t for t in all_terms if len(t) == Constants.ONE}
-
-        result_parts = []
-        i = Constants.ZERO
-        while i < len(term):
-            if i + Constants.ONE < len(term) and term[i:i + Constants.TWO] == '¬':
-                var = term[i + Constants.TWO] if i + Constants.TWO < len(term) else ''
-                if var not in single_vars:
-                    result_parts.append(term[i:i + Constants.TWO])
-                i += Constants.TWO
-            else:
-                result_parts.append(term[i])
-                i += Constants.ONE
-
-        simplified = ''.join(result_parts)
-        return simplified if simplified else term
-
+    # ---------- Минимизация КНФ ----------
     def _minimize_cnf(self):
-        """Минимизация КНФ путём инверсии карты и использования алгоритма ДНФ"""
         if self.map is None:
             return "Ошибка"
+        zeros = self._collect_zeros()
+        if not zeros:
+            return Constants.DEFAULT_OUTPUT_ONE
+        if len(zeros) == self._total_cells():
+            return Constants.DEFAULT_OUTPUT_ZERO
 
+        temp_map = self._invert_map()
+        original_map = self.map
+        self.map = temp_map
+        prime_implicants = self._find_prime_implicants()
+        self.map = original_map
+
+        if not prime_implicants:
+            return Constants.DEFAULT_OUTPUT_ONE
+        selected_terms = self._essential_and_greedy(prime_implicants, zeros)
+        cnf_terms = self._terms_to_cnf(selected_terms)
+        if len(cnf_terms) == 1:
+            return cnf_terms[0]
+        return " ∧ ".join(cnf_terms)
+
+    def _collect_zeros(self):
         rows, cols, layers = self._get_dimensions()
-
-        # Собираем координаты нулей
         zeros = []
-
-        # Для 1 переменной особый случай
         if self.n == Constants.ONE:
             for i in range(rows):
                 if self.map[i] == Constants.ZERO:
@@ -424,169 +401,118 @@ class KarnaughMapMinimizer:
             for layer in range(layers):
                 for r in range(rows):
                     for c in range(cols):
-                        if layers == Constants.ONE:
-                            if self.map[r][c] == Constants.ZERO:
-                                zeros.append((r, c))
-                        else:
-                            if self.map[layer][r][c] == Constants.ZERO:
-                                zeros.append((layer, r, c))
+                        if self._rect_value(layer, r, c, layers) == Constants.ZERO:
+                            zeros.append((r, c) if layers == Constants.ONE else (layer, r, c))
+        return zeros
 
-        if not zeros:
-            return Constants.DEFAULT_OUTPUT_ONE
-        total_cells = rows * cols * layers
-        if len(zeros) == total_cells:
-            return Constants.DEFAULT_OUTPUT_ZERO
-
+    def _invert_map(self):
         if self.n == Constants.ONE:
-            temp_map = [Constants.ONE - self.map[i] for i in range(rows)]
-        elif layers == Constants.ONE:
-            temp_map = [[Constants.ONE - self.map[r][c] for c in range(cols)] for r in range(rows)]
-        else:
-            temp_map = [[[Constants.ONE - self.map[l][r][c] for c in range(cols)] for r in range(rows)] for l in
-                        range(layers)]
+            return [1 - val for val in self.map]
+        rows, cols, layers = self._get_dimensions()
+        if layers == 1:
+            return [[1 - self.map[r][c] for c in range(cols)] for r in range(rows)]
+        return [[[1 - self.map[l][r][c] for c in range(cols)] for r in range(rows)] for l in range(layers)]
 
-        original_map = self.map
-        self.map = temp_map
-        prime_implicants = self._find_prime_implicants()
-        self.map = original_map
-
-        if not prime_implicants:
-            return Constants.DEFAULT_OUTPUT_ONE
-
-        uncovered = set(zeros)
-        selected_terms = []
-        selected_cells = []
-
-        for cell in zeros:
-            covering_imps = [imp for imp in prime_implicants if cell in imp['cells']]
-            if len(covering_imps) == Constants.ONE:
-                imp = covering_imps[Constants.ZERO_INDEX]
-                if imp not in selected_terms:
-                    selected_terms.append(imp)
-                    selected_cells.append(imp)
-                    uncovered -= imp['cells']
-
-        while uncovered:
-            best_impl = None
-            best_covered = set()
-            for impl in prime_implicants:
-                if impl in selected_cells:
-                    continue
-                covered = impl['cells'] & uncovered
-                if len(covered) > len(best_covered):
-                    best_covered = covered
-                    best_impl = impl
-
-            if best_impl is None or len(best_covered) == Constants.ZERO:
-                break
-
-            selected_terms.append(best_impl)
-            selected_cells.append(best_impl)
-            uncovered -= best_covered
-
+    def _terms_to_cnf(self, selected_terms):
         cnf_terms = []
         for imp in selected_terms:
             term = imp['term']
             if term == Constants.DEFAULT_OUTPUT_ONE:
                 continue
-            elif term == Constants.DEFAULT_OUTPUT_ZERO:
+            if term == Constants.DEFAULT_OUTPUT_ZERO:
                 cnf_terms.append(Constants.DEFAULT_OUTPUT_ONE)
                 continue
-
-            disjuncts = []
-            i = Constants.ZERO
-            while i < len(term):
-                if term[i] == Constants.OP_NOT:
-                    disjuncts.append(term[i + Constants.ONE])
-                    i += Constants.TWO
-                else:
-                    disjuncts.append(f"{Constants.OP_NOT}{term[i]}")
-                    i += Constants.ONE
-
-            if len(disjuncts) == Constants.ONE:
-                cnf_term = disjuncts[Constants.ZERO_INDEX]
+            disjuncts = self._disjuncts_from_term(term)
+            if len(disjuncts) == 1:
+                cnf_terms.append(disjuncts[0])
             else:
-                cnf_term = f"({f' {Constants.OP_OR_SYMBOL} '.join(disjuncts)})"
-            cnf_terms.append(cnf_term)
+                cnf_terms.append(f"({f' ∨ '.join(disjuncts)})")
+        return cnf_terms
 
-        if not cnf_terms:
-            return Constants.DEFAULT_OUTPUT_ONE
+    def _disjuncts_from_term(self, term_str):
+        disjuncts = []
+        i = 0
+        while i < len(term_str):
+            if term_str[i] == Constants.OP_NOT:
+                disjuncts.append(term_str[i + 1])  # ¬a -> a
+                i += 2
+            else:
+                disjuncts.append(f"{Constants.OP_NOT}{term_str[i]}")  # a -> ¬a
+                i += 1
+        return disjuncts
 
-        if len(cnf_terms) == Constants.ONE:
-            return cnf_terms[Constants.ZERO_INDEX]
-        return f" {Constants.OP_AND_SYMBOL} ".join(cnf_terms)
-
+    # ---------- Печать карты Карно ----------
     def print_kmap(self):
-        """Печать карты Карно и результатов минимизации"""
         if self.map is None:
             print("\nОшибка: Карта Карно не может быть построена")
             return
-
         print("\nКарта Карно:")
-
         if self.n == Constants.ONE:
-            print("│ a │ f │")
-            print(f"│ 0 │ {self.map[Constants.ZERO_INDEX]} │")
-            print(f"│ 1 │ {self.map[Constants.FIRST_INDEX]} │")
+            self._print_kmap_1()
         elif self.n == Constants.TWO:
-            print("│a\\b│ 0 │ 1 │")
-            for i in range(Constants.TWO):
-                print(f"│ {i} │ {self.map[i][Constants.ZERO_INDEX]} │ {self.map[i][Constants.FIRST_INDEX]} │")
+            self._print_kmap_2()
         elif self.n == Constants.THREE:
-            print("│a\\bc│ 00 │ 01 │ 11 │ 10 │")
-            for i in range(Constants.TWO):
-                print(
-                    f"│ {i}  │  {self.map[i][Constants.ZERO_INDEX]}  │  {self.map[i][Constants.FIRST_INDEX]}  │  {self.map[i][Constants.SECOND_INDEX]}  │  {self.map[i][Constants.THIRD_INDEX]}  │")
+            self._print_kmap_3()
         elif self.n == Constants.FOUR:
-            print("│AB\\CD│ 00 │ 01 │ 11 │ 10 │")
-            ab_labels = ["00", "01", "11", "10"]
-            for i in range(Constants.FOUR):
-                print(
-                    f"│ {ab_labels[i]} │  {self.map[i][Constants.ZERO_INDEX]}  │  {self.map[i][Constants.FIRST_INDEX]}  │  {self.map[i][Constants.SECOND_INDEX]}  │  {self.map[i][Constants.THIRD_INDEX]}  │")
+            self._print_kmap_4()
         elif self.n == Constants.FIVE:
-            gray_3bit = ["000", "001", "011", "010", "110", "111", "101", "100"]
-            row_labels = ["00", "01", "11", "10"]
-            print("\nКарта Карно для 5 переменных:")
-            print("ab \\ cde\t" + "\t".join(gray_3bit))
-            print("-" * (15 + 8 * len(gray_3bit)))
-            for ab_idx, ab_label in enumerate(row_labels):
-                row_str = f"{ab_label}\t\t"
-                for cde_label in gray_3bit:
-                    e = int(cde_label[Constants.TWO])
-                    cd_bits = cde_label[:Constants.TWO]
-                    cd_idx = row_labels.index(cd_bits)
-                    val = self.map[e][ab_idx][cd_idx]
-                    row_str += f"\t{val}"
-                print(row_str)
+            self._print_kmap_5()
 
         prime_implicants = self._find_prime_implicants()
-        minimized_dnf = self._minimize_dnf(prime_implicants)
-        print(f"\nМинимизированная ДНФ:\n{minimized_dnf}")
+        print(f"\nМинимизированная ДНФ:\n{self._minimize_dnf(prime_implicants)}")
+        print(f"\nМинимизированная КНФ:\n{self._minimize_cnf()}")
 
-        minimized_cnf = self._minimize_cnf()
-        print(f"\nМинимизированная КНФ:\n{minimized_cnf}")
+    def _print_kmap_1(self):
+        print("│ a │ f │")
+        print(f"│ 0 │ {self.map[0]} │")
+        print(f"│ 1 │ {self.map[1]} │")
 
-def _format_result(self, expr: str) -> str:
-            """Форматирование результата с правильными скобками и пробелами"""
-            if not expr:
-                return expr
+    def _print_kmap_2(self):
+        print("│a\\b│ 0 │ 1 │")
+        for i in range(2):
+            print(f"│ {i} │ {self.map[i][0]} │ {self.map[i][1]} │")
 
-            if f' {Constants.OP_OR_SYMBOL} ' in expr:
-                terms = expr.split(f' {Constants.OP_OR_SYMBOL} ')
-                formatted = []
-                for term in terms:
-                    term = term.strip()
-                    if len(term) > Constants.ONE and Constants.OP_OR_SYMBOL not in term and Constants.OP_AND_SYMBOL not in term:
-                        # Слитный терм типа ab!c
-                        if any(c in term for c in Constants.OP_NOT):
-                            formatted.append(term)
-                        else:
-                            formatted.append(term)
-                    else:
-                        formatted.append(term)
-                return f" {Constants.OP_OR_SYMBOL} ".join(formatted)
+    def _print_kmap_3(self):
+        print("│a\\bc│ 00 │ 01 │ 11 │ 10 │")
+        for i in range(2):
+            print(f"│ {i}  │  {self.map[i][0]}  │  {self.map[i][1]}  │  {self.map[i][2]}  │  {self.map[i][3]}  │")
 
-            if f' {Constants.OP_AND_SYMBOL} ' in expr:
-                return expr
+    def _print_kmap_4(self):
+        print("│AB\\CD│ 00 │ 01 │ 11 │ 10 │")
+        ab_labels = ["00", "01", "11", "10"]
+        for i in range(4):
+            print(f"│ {ab_labels[i]} │  {self.map[i][0]}  │  {self.map[i][1]}  │  {self.map[i][2]}  │  {self.map[i][3]}  │")
 
+    def _print_kmap_5(self):
+        gray_3bit = ["000", "001", "011", "010", "110", "111", "101", "100"]
+        row_labels = ["00", "01", "11", "10"]
+        print("\nКарта Карно для 5 переменных:")
+        print("ab \\ cde\t" + "\t".join(gray_3bit))
+        print("-" * (15 + 8 * len(gray_3bit)))
+        for ab_idx, ab_label in enumerate(row_labels):
+            row_str = f"{ab_label}\t\t"
+            for cde_label in gray_3bit:
+                e = int(cde_label[2])
+                cd_bits = cde_label[:2]
+                cd_idx = row_labels.index(cd_bits)
+                val = self.map[e][ab_idx][cd_idx]
+                row_str += f"\t{val}"
+            print(row_str)
+
+    def _format_result(self, expr: str) -> str:
+        """Форматирование результата с правильными скобками и пробелами"""
+        if not expr:
             return expr
+        # Для ДНФ
+        if f' {Constants.OP_OR_SYMBOL} ' in expr:
+            terms = expr.split(f' {Constants.OP_OR_SYMBOL} ')
+            formatted = []
+            for term in terms:
+                term = term.strip()
+                # можно дополнительно обработать слитные термы
+                formatted.append(term)
+            return f" {Constants.OP_OR_SYMBOL} ".join(formatted)
+        # Для КНФ
+        if f' {Constants.OP_AND_SYMBOL} ' in expr:
+            return expr
+        return expr
