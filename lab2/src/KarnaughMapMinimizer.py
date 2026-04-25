@@ -11,7 +11,6 @@ class KarnaughMapMinimizer:
         self.size = Constants.POWER_BASE ** self.n
         self.map = self._build_kmap()
 
-    # ---------- Вспомогательные функции ----------
     @staticmethod
     def _get_output(item):
         if isinstance(item, dict):
@@ -73,7 +72,6 @@ class KarnaughMapMinimizer:
             layer, row, col = cell
             return self.map[layer][row][col]
 
-    # ---------- Построение карты Карно ----------
     def _build_kmap(self):
         if self.n == Constants.ONE:
             return self._build_kmap_1()
@@ -131,7 +129,6 @@ class KarnaughMapMinimizer:
             kmap[e][row][col] = self._get_output(self.truth_table[i])
         return kmap
 
-    # ---------- Поиск простых импликант ----------
     def _find_prime_implicants(self):
         if self.map is None:
             return []
@@ -197,7 +194,6 @@ class KarnaughMapMinimizer:
             prime_implicants[:] = [imp for imp in prime_implicants if not imp['cells'].issubset(cells_set)]
             prime_implicants.append({'cells': cells_set, 'term': term})
 
-    # ---------- Минимизация ДНФ ----------
     def _minimize_dnf(self, prime_implicants):
         if self.map is None:
             return "Ошибка"
@@ -236,7 +232,6 @@ class KarnaughMapMinimizer:
         return rows * cols * layers
 
     def _essential_and_greedy(self, prime_implicants, must_cover):
-        # Существенные импликанты
         uncovered = set(must_cover)
         selected = []
         for cell in must_cover:
@@ -246,7 +241,6 @@ class KarnaughMapMinimizer:
                 if imp not in selected:
                     selected.append(imp)
                     uncovered -= imp['cells']
-        # Жадное покрытие
         while uncovered:
             best = max(
                 (imp for imp in prime_implicants if imp not in selected),
@@ -259,12 +253,10 @@ class KarnaughMapMinimizer:
             uncovered -= best['cells']
         return selected
 
-    # ---------- Упрощение термов ДНФ ----------
     def _simplify_dnf_terms(self, terms):
         if not terms:
             return terms
         parsed = [self._parse_term(term) for term in terms]
-        # Поглощение и склеивание
         changed = True
         while changed:
             changed = False
@@ -298,7 +290,7 @@ class KarnaughMapMinimizer:
             for j in range(len(new_parsed)):
                 if i != j and new_parsed[i][1].issubset(new_parsed[j][1]):
                     del new_parsed[j]
-                    return new_parsed  # перезапустим внешний цикл
+                    return new_parsed  
         return parsed
 
     def _try_combine_pair(self, new_parsed, lits_a, lits_b):
@@ -317,7 +309,7 @@ class KarnaughMapMinimizer:
                             new_parsed.append((new_term, new_lits))
                             changed = True
             if changed:
-                return True  # достаточно одного добавления
+                return True 
         return False
 
     def _combine_terms(self, parsed):
@@ -332,7 +324,6 @@ class KarnaughMapMinimizer:
     def _lits_to_str(self, literals):
         return ''.join(sorted(literals, key=lambda x: (x.startswith(Constants.OP_NOT), x[-1])))
 
-    # ---------- Преобразование клеток в терм ----------
     def _cells_to_term(self, cells):
         if not cells:
             return Constants.DEFAULT_OUTPUT_ZERO
@@ -366,7 +357,6 @@ class KarnaughMapMinimizer:
                 i += 1
         return bool(pos & neg)
 
-    # ---------- Минимизация КНФ ----------
     def _minimize_cnf(self):
         if self.map is None:
             return "Ошибка"
@@ -434,14 +424,13 @@ class KarnaughMapMinimizer:
         i = 0
         while i < len(term_str):
             if term_str[i] == Constants.OP_NOT:
-                disjuncts.append(term_str[i + 1])  # ¬a -> a
+                disjuncts.append(term_str[i + 1]) 
                 i += 2
             else:
-                disjuncts.append(f"{Constants.OP_NOT}{term_str[i]}")  # a -> ¬a
+                disjuncts.append(f"{Constants.OP_NOT}{term_str[i]}")  
                 i += 1
         return disjuncts
 
-    # ---------- Печать карты Карно ----------
     def print_kmap(self):
         if self.map is None:
             print("\nОшибка: Карта Карно не может быть построена")
@@ -503,16 +492,13 @@ class KarnaughMapMinimizer:
         """Форматирование результата с правильными скобками и пробелами"""
         if not expr:
             return expr
-        # Для ДНФ
         if f' {Constants.OP_OR_SYMBOL} ' in expr:
             terms = expr.split(f' {Constants.OP_OR_SYMBOL} ')
             formatted = []
             for term in terms:
                 term = term.strip()
-                # можно дополнительно обработать слитные термы
                 formatted.append(term)
             return f" {Constants.OP_OR_SYMBOL} ".join(formatted)
-        # Для КНФ
         if f' {Constants.OP_AND_SYMBOL} ' in expr:
             return expr
         return expr
