@@ -1,0 +1,90 @@
+"""
+Интерактивное меню для работы с хеш-таблицей.
+"""
+
+from hash_table import HashTable
+
+
+MENU_TEXT = """
+Выберите действие:
+  1. Добавить запись
+  2. Найти запись
+  3. Обновить запись
+  4. Удалить запись
+  5. Показать таблицу
+  6. Выход
+Ваш выбор: """
+
+
+def get_non_empty(prompt: str) -> str:
+    """Запрашивает строку, пока не будет введено что-то непустое."""
+    while True:
+        s = input(prompt).strip()
+        if s:
+            return s
+        print("Поле не может быть пустым.")
+
+
+def is_valid_key(key: str) -> bool:
+    """Проверяет, что ключ состоит из русских букв и длиной >= 2."""
+    if len(key) < 2:
+        return False
+    return all('а' <= ch <= 'я' or ch == 'ё' for ch in key.lower())
+
+
+def main() -> None:
+    print("Инициализация хеш-таблицы (размер 20).")
+    ht = HashTable()
+
+    while True:
+        choice = input(MENU_TEXT).strip()
+
+        if choice == '1':
+            key = get_non_empty("Введите ключ (минимум 2 русские буквы): ")
+            if not is_valid_key(key):
+                print("Ошибка: ключ должен содержать только русские буквы (минимум 2).")
+                continue
+            data = get_non_empty("Введите данные: ")
+            if ht.insert(key, data):
+                print("Запись добавлена.")
+            else:
+                print("Не удалось добавить запись.")
+            print(f"Текущий коэффициент заполнения: {ht.fill_ratio():.2f}")
+
+        elif choice == '2':
+            key = get_non_empty("Введите ключ для поиска: ")
+            result = ht.search(key)
+            if result is not None:
+                print(f"Данные: {result}")
+            else:
+                print("Ключ не найден.")
+
+        elif choice == '3':
+            key = get_non_empty("Введите ключ для обновления: ")
+            new_data = get_non_empty("Введите новые данные: ")
+            if ht.update(key, new_data):
+                print("Запись обновлена.")
+            else:
+                print("Ключ не найден.")
+
+        elif choice == '4':
+            key = get_non_empty("Введите ключ для удаления: ")
+            if ht.delete(key):
+                print("Запись удалена.")
+            else:
+                print("Ключ не найден.")
+
+        elif choice == '5':
+            print("\nТекущая хеш-таблица:")
+            ht.display()
+
+        elif choice == '6':
+            print("Выход.")
+            break
+
+        else:
+            print("Некорректный ввод. Выберите 1–6.")
+
+
+if __name__ == "__main__":
+    main()
